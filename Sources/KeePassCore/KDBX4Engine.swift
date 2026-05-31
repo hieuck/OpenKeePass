@@ -79,7 +79,8 @@ public struct KDBX4Engine: KDBXEngine {
             throw KDBXError.wrongCredentials
         }
 
-        let body = decryptedPayload.subdata(in: streamStartBytes.count..<decryptedPayload.count)
+        let payload = decryptedPayload.subdata(in: streamStartBytes.count..<decryptedPayload.count)
+        let body = KDBX3BlockStream.isLikelyUnwrappedPayload(payload) ? payload : try KDBX3BlockStream.read(payload)
         let xml = try KDBXPayloadCompression.decode(body, compression: header.compression)
         return try KeePassXMLParser.parse(xml, protectedStream: protectedStream(for: header))
     }
