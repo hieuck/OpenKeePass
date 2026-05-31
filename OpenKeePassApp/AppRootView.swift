@@ -13,8 +13,10 @@ struct AppRootView: View {
     @State private var isLocked = false
     @State private var isAuthenticating = false
     @State private var lockMessage: String?
+    @State private var appMessage: String?
 
     private let biometricGate = LocalBiometricGate()
+    private let bookmarkStore = VaultBookmarkStore()
 
     var body: some View {
         NavigationView {
@@ -22,20 +24,21 @@ struct AppRootView: View {
                 selectedVault: $selectedVault,
                 isImportingVault: $isImportingVault,
                 isCreatingVault: $isCreatingVault,
-                isShowingSettings: $isShowingSettings
+                isShowingSettings: $isShowingSettings,
+                forgetSelectedVault: forgetSelectedVault
             )
             Text("Select a vault")
                 .foregroundColor(.secondary)
         }
         .sheet(isPresented: $isImportingVault) {
             DocumentPicker { url in
-                selectedVault = VaultReference(url: url)
+                selectVault(url)
             }
         }
         .sheet(isPresented: $isCreatingVault) {
             NavigationView {
                 CreateVaultView { vault in
-                    selectedVault = vault
+                    selectVault(vault.url)
                 }
             }
         }
@@ -56,7 +59,44 @@ struct AppRootView: View {
         .onChange(of: scenePhase) { phase in
             handleScenePhaseChange(phase)
         }
+        .onAppear {
+            if selectedVault == nil, let url = bookmarkStore.restore() {
+                selectedVault = VaultReference(url: url)
+            }
+        }
+        .alert("OpenKeePass", isPresented: appMessageBinding) {
+            Button("OK", role: .cancel) {
+                appMessage = nil
+            }
+        } message: {
+            Text(appMessage ?? "")
+        }
         .navigationViewStyle(DoubleColumnNavigationViewStyle())
+    }
+
+    private var appMessageBinding: Binding<Bool> {
+        Binding(
+            get: { appMessage != nil },
+            set: { newValue in
+                if !newValue {
+                    appMessage = nil
+                }
+            }
+        )
+    }
+
+    private func selectVault(_ url: URL) {
+        selectedVault = VaultReference(url: url)
+        do {
+            try bookmarkStore.save(url)
+        } catch {
+            appMessage = "Could not remember this vault for next launch."
+        }
+    }
+
+    private func forgetSelectedVault() {
+        bookmarkStore.clear()
+        selectedVault = nil
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {

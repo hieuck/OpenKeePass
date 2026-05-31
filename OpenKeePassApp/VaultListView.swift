@@ -5,6 +5,7 @@ struct VaultListView: View {
     @Binding var isImportingVault: Bool
     @Binding var isCreatingVault: Bool
     @Binding var isShowingSettings: Bool
+    var forgetSelectedVault: () -> Void = {}
 
     var body: some View {
         List {
@@ -26,6 +27,11 @@ struct VaultListView: View {
                 Section("Recent") {
                     NavigationLink(destination: UnlockView(vault: selectedVault)) {
                         Label(selectedVault.url.lastPathComponent, systemImage: "lock.doc")
+                    }
+                    Button(role: .destructive) {
+                        forgetSelectedVault()
+                    } label: {
+                        Label("Forget Recent Vault", systemImage: "trash")
                     }
                 }
             }
