@@ -3,6 +3,7 @@ import SwiftUI
 struct VaultListView: View {
     @Binding var selectedVault: VaultReference?
     @Binding var isImportingVault: Bool
+    @Binding var isCreatingVault: Bool
     @Binding var isShowingSettings: Bool
 
     var body: some View {
@@ -15,7 +16,7 @@ struct VaultListView: View {
                 }
 
                 Button {
-                    selectedVault = VaultReference(url: URL(fileURLWithPath: "NewVault.kdbx"))
+                    isCreatingVault = true
                 } label: {
                     Label("Create New Vault", systemImage: "plus.circle")
                 }

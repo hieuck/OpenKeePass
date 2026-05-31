@@ -52,13 +52,11 @@ final class VaultSessionModel: ObservableObject {
             isSaving = false
         }
 
-        let canAccess = fileURL.startAccessingSecurityScopedResource()
-        guard canAccess else {
-            errorMessage = "OpenKeePass could not access this file. Re-select it from Files."
-            return
-        }
+        let didStartAccess = fileURL.startAccessingSecurityScopedResource()
         defer {
-            fileURL.stopAccessingSecurityScopedResource()
+            if didStartAccess {
+                fileURL.stopAccessingSecurityScopedResource()
+            }
         }
 
         do {

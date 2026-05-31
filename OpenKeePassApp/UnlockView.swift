@@ -56,12 +56,11 @@ struct UnlockView: View {
 
     private func unlock() async {
         errorMessage = nil
-        guard vault.url.startAccessingSecurityScopedResource() else {
-            errorMessage = "OpenKeePass could not access this file. Re-select it from Files."
-            return
-        }
+        let didStartAccess = vault.url.startAccessingSecurityScopedResource()
         defer {
-            vault.url.stopAccessingSecurityScopedResource()
+            if didStartAccess {
+                vault.url.stopAccessingSecurityScopedResource()
+            }
         }
 
         do {

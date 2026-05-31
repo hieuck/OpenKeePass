@@ -3,6 +3,7 @@ import SwiftUI
 struct AppRootView: View {
     @State private var selectedVault: VaultReference?
     @State private var isImportingVault = false
+    @State private var isCreatingVault = false
     @State private var isShowingSettings = false
 
     var body: some View {
@@ -10,6 +11,7 @@ struct AppRootView: View {
             VaultListView(
                 selectedVault: $selectedVault,
                 isImportingVault: $isImportingVault,
+                isCreatingVault: $isCreatingVault,
                 isShowingSettings: $isShowingSettings
             )
             Text("Select a vault")
@@ -18,6 +20,13 @@ struct AppRootView: View {
         .sheet(isPresented: $isImportingVault) {
             DocumentPicker { url in
                 selectedVault = VaultReference(url: url)
+            }
+        }
+        .sheet(isPresented: $isCreatingVault) {
+            NavigationView {
+                CreateVaultView { vault in
+                    selectedVault = vault
+                }
             }
         }
         .sheet(isPresented: $isShowingSettings) {
