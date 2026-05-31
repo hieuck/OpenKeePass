@@ -114,13 +114,10 @@ extension Data {
     }
 
     func littleEndianUInt64(at offset: Int) -> UInt64 {
-        UInt64(self[offset])
-            | (UInt64(self[offset + 1]) << 8)
-            | (UInt64(self[offset + 2]) << 16)
-            | (UInt64(self[offset + 3]) << 24)
-            | (UInt64(self[offset + 4]) << 32)
-            | (UInt64(self[offset + 5]) << 40)
-            | (UInt64(self[offset + 6]) << 48)
-            | (UInt64(self[offset + 7]) << 56)
+        var value: UInt64 = 0
+        for index in 0..<8 {
+            value |= UInt64(self[offset + index]) << UInt64(index * 8)
+        }
+        return value
     }
 }

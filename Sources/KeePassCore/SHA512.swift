@@ -31,14 +31,12 @@ public enum SHA512 {
 
             for index in 0..<16 {
                 let offset = chunkStart + index * 8
-                words[index] = UInt64(message[offset]) << 56
-                    | UInt64(message[offset + 1]) << 48
-                    | UInt64(message[offset + 2]) << 40
-                    | UInt64(message[offset + 3]) << 32
-                    | UInt64(message[offset + 4]) << 24
-                    | UInt64(message[offset + 5]) << 16
-                    | UInt64(message[offset + 6]) << 8
-                    | UInt64(message[offset + 7])
+                var word: UInt64 = 0
+                for byteIndex in 0..<8 {
+                    word <<= 8
+                    word |= UInt64(message[offset + byteIndex])
+                }
+                words[index] = word
             }
 
             for index in 16..<80 {
