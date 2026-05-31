@@ -1,4 +1,5 @@
 import KeePassCore
+import PasswordTools
 import SwiftUI
 import UIKit
 
@@ -34,6 +35,10 @@ struct EntryDetailView: View {
                     }
                 }
 
+                if let otpConfiguration = try? TOTPConfiguration(keePassFields: entry.customFields.map { (name: $0.name, value: $0.value) }) {
+                    OneTimePasswordSection(configuration: otpConfiguration)
+                }
+
                 Section {
                     NavigationLink("Edit", destination: EntryEditorView(entry: entry) { updatedEntry in
                         model.updateEntry(updatedEntry)
@@ -46,6 +51,47 @@ struct EntryDetailView: View {
                 .foregroundColor(.secondary)
                 .navigationTitle("Entry")
         }
+    }
+}
+
+private struct OneTimePasswordSection: View {
+    let configuration: TOTPConfiguration
+    private let generator = TOTPGenerator()
+
+    var body: some View {
+        Section("One-Time Password") {
+            TimelineView(.periodic(from: Date(), by: 1)) { context in
+                let code = (try? generator.code(configuration: configuration, timeInterval: context.date.timeIntervalSince1970)) ?? "------"
+                let remaining = secondsRemaining(at: context.date)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(code)
+                            .font(.title2.monospacedDigit())
+                            .textSelection(.enabled)
+                        Spacer()
+                        Button {
+                            UIPasteboard.general.string = code
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .accessibilityLabel("Copy One-Time Password")
+                    }
+
+                    HStack {
+                        ProgressView(value: Double(remaining), total: Double(configuration.period))
+                        Text("\(remaining)s")
+                            .font(.caption.monospacedDigit())
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private func secondsRemaining(at date: Date) -> Int {
+        let elapsed = Int(date.timeIntervalSince1970) % configuration.period
+        return configuration.period - elapsed
     }
 }
 
