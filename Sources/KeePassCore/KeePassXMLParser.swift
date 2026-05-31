@@ -199,7 +199,8 @@ public enum KeePassXMLParser {
         in xml: String,
         protectedStream: KDBX4InnerHeader.ProtectedStream
     ) throws -> String {
-        var stream: ChaCha20Stream?
+        var chaCha20Stream: ChaCha20Stream?
+        var salsa20Stream: Salsa20Stream?
         var result = ""
         var cursor = xml.startIndex
         let valuePrefix = "<Value"
@@ -217,18 +218,23 @@ public enum KeePassXMLParser {
             result.append(contentsOf: xml[cursor..<contentStart])
             let content = String(xml[contentStart..<closeRange.lowerBound])
             if isProtectedValueTag(openTag) {
-                guard protectedStream.algorithm == .chaCha20 else {
-                    throw KDBXError.unsupportedFeature("Salsa20 protected values are not implemented yet")
-                }
-                if stream == nil {
-                    stream = try ChaCha20Stream.protectedValueStream(innerKey: protectedStream.key)
-                }
-
                 let encryptedBase64 = decodeXML(content.trimmingCharacters(in: .whitespacesAndNewlines))
                 guard let encrypted = Data(base64Encoded: encryptedBase64) else {
                     throw KDBXError.corruptDatabase
                 }
-                let decrypted = try stream!.apply(to: encrypted)
+                let decrypted: Data
+                switch protectedStream.algorithm {
+                case .chaCha20:
+                    if chaCha20Stream == nil {
+                        chaCha20Stream = try ChaCha20Stream.protectedValueStream(innerKey: protectedStream.key)
+                    }
+                    decrypted = try chaCha20Stream!.apply(to: encrypted)
+                case .salsa20:
+                    if salsa20Stream == nil {
+                        salsa20Stream = try Salsa20Stream.protectedValueStream(key: protectedStream.key)
+                    }
+                    decrypted = try salsa20Stream!.apply(to: encrypted)
+                }
                 guard let decryptedValue = String(data: decrypted, encoding: .utf8) else {
                     throw KDBXError.corruptDatabase
                 }

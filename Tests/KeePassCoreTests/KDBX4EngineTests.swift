@@ -14,14 +14,14 @@ final class KDBX4EngineTests: XCTestCase {
         }
     }
 
-    func testOpenClassifiesKDBX3AsUnsupportedForThisEngine() async {
+    func testOpenRejectsIncompleteKDBX3Payload() async {
         let engine = KDBX4Engine()
 
         do {
             _ = try await engine.open(data: .kdbxHeader(major: 3, minor: 1), credentials: .init(password: "pw"))
-            XCTFail("Expected KDBX3 data to throw")
+            XCTFail("Expected incomplete KDBX3 data to throw")
         } catch {
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 3.1 is not supported by KDBX4Engine"))
+            XCTAssertEqual(error as? KDBXError, .corruptDatabase)
         }
     }
 

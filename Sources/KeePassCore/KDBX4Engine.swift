@@ -5,6 +5,9 @@ public struct KDBX4Engine: KDBXEngine {
 
     public func open(data: Data, credentials: KDBXCredentials) async throws -> KeePassVault {
         let header = try KDBXHeader.parse(data)
+        if header.majorVersion == 3 {
+            return try openKDBX3(data: data, header: header, credentials: credentials)
+        }
         guard header.majorVersion == 4 else {
             throw KDBXError.unsupportedFeature("KDBX \(header.majorVersion).\(header.minorVersion) is not supported by KDBX4Engine")
         }
@@ -44,6 +47,57 @@ public struct KDBX4Engine: KDBXEngine {
         }
 
         throw KDBXError.unsupportedFeature("KDBX 4 payload is incomplete or unsupported")
+    }
+
+    private func openKDBX3(data: Data, header: KDBXHeader, credentials: KDBXCredentials) throws -> KeePassVault {
+        guard
+            let masterSeed = header.masterSeed,
+            let transformSeed = header.transformSeed,
+            let transformRounds = header.transformRounds,
+            let cipherID = header.cipherID,
+            let encryptionIV = header.encryptionIV,
+            let streamStartBytes = header.streamStartBytes
+        else {
+            throw KDBXError.corruptDatabase
+        }
+
+        let compositeKey = try KDBXCompositeKey.material(from: credentials)
+        let transformedKey = try KDBXKeyDerivation.transform(
+            compositeKey: compositeKey,
+            parameters: .aes(seed: transformSeed, rounds: transformRounds)
+        )
+        let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformedKey)
+        let encryptedPayload = Data(data.suffix(from: header.headerByteCount))
+        let decryptedPayload = try KDBXPayloadDecryptor.decrypt(
+            ciphertext: encryptedPayload,
+            cipherID: cipherID,
+            finalKey: finalKey,
+            encryptionIV: encryptionIV
+        )
+
+        guard decryptedPayload.starts(with: streamStartBytes) else {
+            throw KDBXError.wrongCredentials
+        }
+
+        let body = decryptedPayload.subdata(in: streamStartBytes.count..<decryptedPayload.count)
+        let xml = try KDBXPayloadCompression.decode(body, compression: header.compression)
+        return try KeePassXMLParser.parse(xml, protectedStream: protectedStream(for: header))
+    }
+
+    private func protectedStream(for header: KDBXHeader) throws -> KDBX4InnerHeader.ProtectedStream? {
+        guard let streamID = header.innerRandomStreamID, streamID != 0 else {
+            return nil
+        }
+        guard let key = header.protectedStreamKey else {
+            throw KDBXError.corruptDatabase
+        }
+
+        switch streamID {
+        case 2:
+            return KDBX4InnerHeader.ProtectedStream(algorithm: .salsa20, key: SHA256.hash(key))
+        default:
+            throw KDBXError.unsupportedFeature("Inner stream algorithm \(streamID) is not supported")
+        }
     }
 
     public func create(name: String, credentials: KDBXCredentials) async throws -> KeePassVault {
