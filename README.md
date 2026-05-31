@@ -31,6 +31,18 @@ swift test
 
 GitHub Actions will generate the Xcode project, run tests, build the app and AutoFill extension, archive the app, and upload `.ipa` artifacts. Unsigned public builds and optional ad-hoc signed builds are both planned.
 
+## KeePass Compatibility Status
+
+The current engine validates real KDBX signatures and versions, then reports unsupported KDBX payload decryption until the crypto layer lands. This is intentional: OpenKeePass must not silently use a proprietary substitute or pretend that unsupported vaults are unlocked.
+
+The next compatibility milestone is fixture-driven KDBX 4 support:
+
+- `Fixtures/KDBX/password-only.kdbx`
+- `Fixtures/KDBX/password-keyfile.kdbx`
+- `Fixtures/KDBX/password-keyfile.key`
+
+Those fixtures must be generated with a representative KeePass-compatible desktop app and contain only non-sensitive sample entries.
+
 ## Free Feature Policy
 
 Any feature merged into this repository must be fully usable without payment. Code that adds StoreKit purchases, subscriptions, paywalls, ads, telemetry, or feature locks is out of scope for this product.
