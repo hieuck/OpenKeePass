@@ -37,18 +37,39 @@ final class KDBXKeyDerivationTests: XCTestCase {
         XCTAssertEqual(KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed), SHA256.hash(expectedInput))
     }
 
-    func testArgon2TransformReportsUnsupportedUntilImplemented() {
+    func testArgon2IDTransformMatchesKnownVector() throws {
         let parameters = KDBXKDFParameters.argon2(
             variant: .argon2id,
             version: 0x13,
-            salt: Data(repeating: 0, count: 32),
+            salt: Data(repeating: 0x02, count: 16),
             iterations: 2,
-            memory: 1024,
+            memory: 32,
             parallelism: 1
         )
 
-        XCTAssertThrowsError(try KDBXKeyDerivation.transform(compositeKey: Data(repeating: 0, count: 32), parameters: parameters)) { error in
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("Argon2 KDF is not implemented yet"))
-        }
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: Data(0..<32), parameters: parameters)
+
+        XCTAssertEqual(transformed.hexEncodedLowercase(), "bd999d4d312bb8646d114480679b447db41ea3b4561b4d3f868a2f3b2b0853f8")
+    }
+
+    func testArgon2DTransformMatchesKnownVector() throws {
+        let parameters = KDBXKDFParameters.argon2(
+            variant: .argon2d,
+            version: 0x13,
+            salt: Data(repeating: 0x02, count: 16),
+            iterations: 2,
+            memory: 32,
+            parallelism: 1
+        )
+
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: Data(0..<32), parameters: parameters)
+
+        XCTAssertEqual(transformed.hexEncodedLowercase(), "6fdd56aa45607a8a8189cc793fec6843285839842e3085240b321534200bad17")
+    }
+}
+
+private extension Data {
+    func hexEncodedLowercase() -> String {
+        map { String(format: "%02x", $0) }.joined()
     }
 }

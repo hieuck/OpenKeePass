@@ -12,7 +12,15 @@ let package = Package(
         .library(name: "SharedUI", targets: ["SharedUI"])
     ],
     targets: [
-        .target(name: "KeePassCore"),
+        .target(name: "KeePassCore", dependencies: [
+            "CArgon2"
+        ]),
+        .target(
+            name: "CArgon2",
+            path: "Sources/CArgon2",
+            exclude: ["src/genkat.c"],
+            publicHeadersPath: "include"
+        ),
         .target(name: "VaultStore", dependencies: ["KeePassCore", "SecurityKit"]),
         .target(name: "SecurityKit"),
         .target(name: "PasswordTools"),

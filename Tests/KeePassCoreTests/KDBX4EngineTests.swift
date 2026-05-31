@@ -142,16 +142,79 @@ final class KDBX4EngineTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.password, "pass")
     }
 
-    func testOpenWithArgon2HeaderReportsKDFUnsupported() async {
+    func testOpenWithArgon2HeaderDerivesKeyBeforePayloadDecrypt() async {
         let engine = KDBX4Engine()
         let data = Data.kdbx4Argon2Header()
 
         do {
             _ = try await engine.open(data: data, credentials: .init(password: "pw"))
-            XCTFail("Expected Argon2 KDF to remain unsupported")
+            XCTFail("Expected payload decrypt to remain unsupported")
         } catch {
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("Argon2 KDF is not implemented yet"))
+            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload decryption is not implemented yet"))
         }
+    }
+
+    func testOpenWithArgon2IDHeaderAndFramedPayloadReturnsParsedVault() async throws {
+        let engine = KDBX4Engine()
+        let credentials = KDBXCredentials(password: "pw")
+        let masterSeed = Data(repeating: 0xA5, count: 32)
+        let argonSalt = Data(repeating: 0x02, count: 16)
+        let iv = Data(repeating: 0x03, count: 16)
+        let kdfParameters = KDBXKDFParameters.argon2(
+            variant: .argon2id,
+            version: 0x13,
+            salt: argonSalt,
+            iterations: 2,
+            memory: 32,
+            parallelism: 1
+        )
+        let composite = try KDBXCompositeKey.material(from: credentials)
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: kdfParameters)
+        let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
+        let plaintext = Data("""
+        <KeePassFile>
+          <Meta><DatabaseName>Argon Vault</DatabaseName></Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>Server</Value></String>
+                <String><Key>UserName</Key><Value>root</Value></String>
+                <String><Key>Password</Key><Value>toor</Value></String>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """.utf8)
+        let paddingLength = 16 - (plaintext.count % 16)
+        let ciphertext = try AES256(key: finalKey).encryptCBC(
+            plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
+            iv: iv
+        )
+
+        var framedPayload = Data()
+        framedPayload.appendKDBX4Block(index: 0, payload: ciphertext) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+        framedPayload.appendKDBX4Block(index: 1, payload: Data()) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+
+        var data = Data.kdbx4Argon2Header(masterSeed: masterSeed, salt: argonSalt, iv: iv)
+        let header = data
+        data.append(SHA256.hash(header))
+        data.append(HMACSHA256.authenticate(
+            message: header,
+            key: KDBX4HMACKeyDerivation.headerKey(masterSeed: masterSeed, transformedKey: transformed)
+        ))
+        data.append(framedPayload)
+
+        let vault = try await engine.open(data: data, credentials: credentials)
+
+        XCTAssertEqual(vault.name, "Argon Vault")
+        XCTAssertEqual(vault.root.entries.first?.title, "Server")
+        XCTAssertEqual(vault.root.entries.first?.username, "root")
+        XCTAssertEqual(vault.root.entries.first?.password, "toor")
     }
 }
 
@@ -181,15 +244,19 @@ private extension Data {
         ]), masterSeed: masterSeed, cipherID: KDBXCipherID.aes256, iv: iv, payload: payload)
     }
 
-    static func kdbx4Argon2Header() -> Data {
+    static func kdbx4Argon2Header(
+        masterSeed: Data = Data(repeating: 0xA5, count: 32),
+        salt: Data = Data(repeating: 0x02, count: 32),
+        iv: Data? = nil
+    ) -> Data {
         kdbx4Header(kdfParameters: .variantDictionary([
             .bytes("$UUID", KDBXKDFUUID.argon2id),
             .uint32("V", 0x13),
-            .bytes("S", Data(repeating: 0x02, count: 32)),
+            .bytes("S", salt),
             .uint64("I", 2),
-            .uint64("M", 1024),
+            .uint64("M", 32),
             .uint32("P", 1)
-        ]))
+        ]), masterSeed: masterSeed, cipherID: KDBXCipherID.aes256, iv: iv)
     }
 
     static func kdbx4Header(

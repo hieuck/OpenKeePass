@@ -1,4 +1,5 @@
 import Foundation
+import CArgon2
 
 public enum KDBXKeyDerivation {
     public static func transform(compositeKey: Data, parameters: KDBXKDFParameters) throws -> Data {
@@ -9,8 +10,16 @@ public enum KDBXKeyDerivation {
         switch parameters {
         case .aes(let seed, let rounds):
             return try aesTransform(compositeKey: compositeKey, seed: seed, rounds: rounds)
-        case .argon2:
-            throw KDBXError.unsupportedFeature("Argon2 KDF is not implemented yet")
+        case .argon2(let variant, let version, let salt, let iterations, let memory, let parallelism):
+            return try argon2Transform(
+                compositeKey: compositeKey,
+                variant: variant,
+                version: version,
+                salt: salt,
+                iterations: iterations,
+                memory: memory,
+                parallelism: parallelism
+            )
         }
     }
 
@@ -34,5 +43,57 @@ public enum KDBXKeyDerivation {
         }
 
         return SHA256.hash(transformed)
+    }
+
+    private static func argon2Transform(
+        compositeKey: Data,
+        variant: KDBXArgon2Variant,
+        version: UInt32,
+        salt: Data,
+        iterations: UInt64,
+        memory: UInt64,
+        parallelism: UInt32
+    ) throws -> Data {
+        guard iterations <= UInt64(UInt32.max), memory <= UInt64(UInt32.max) else {
+            throw KDBXError.unsupportedFeature("Argon2 KDF parameters exceed supported limits")
+        }
+
+        let outputCount = 32
+        var output = [UInt8](repeating: 0, count: outputCount)
+        let type: argon2_type = {
+            switch variant {
+            case .argon2d:
+                return Argon2_d
+            case .argon2id:
+                return Argon2_id
+            }
+        }()
+
+        let code = compositeKey.withUnsafeBytes { passwordBuffer in
+            salt.withUnsafeBytes { saltBuffer in
+                output.withUnsafeMutableBytes { outputBuffer in
+                    argon2_hash(
+                        UInt32(iterations),
+                        UInt32(memory),
+                        parallelism,
+                        passwordBuffer.baseAddress,
+                        compositeKey.count,
+                        saltBuffer.baseAddress,
+                        salt.count,
+                        outputBuffer.baseAddress,
+                        outputCount,
+                        nil,
+                        0,
+                        type,
+                        version
+                    )
+                }
+            }
+        }
+
+        guard code == ARGON2_OK.rawValue else {
+            throw KDBXError.corruptDatabase
+        }
+        return Data(output)
     }
 }
