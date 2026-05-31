@@ -268,8 +268,18 @@ public struct KDBX4Engine: KDBXEngine {
         for field in entry.customFields.sorted(by: { $0.name < $1.name }) {
             xml.append(try serializeField(name: field.name, value: field.value, isProtected: field.isProtected, indent: indent + "  ", stream: &stream))
         }
+        for attachment in entry.attachments.sorted(by: { $0.name < $1.name }) {
+            xml.append(serializeAttachment(attachment, indent: indent + "  "))
+        }
         xml.append("\(indent)</Entry>\n")
         return xml
+    }
+
+    private func serializeAttachment(_ attachment: KeePassAttachment, indent: String) -> String {
+        let protectedAttribute = attachment.isProtected ? " Protected=\"True\"" : ""
+        return """
+        \(indent)<Binary><Key>\(encodeXML(attachment.name))</Key><Value\(protectedAttribute)>\(attachment.data.base64EncodedString())</Value></Binary>
+        """
     }
 
     private func serializeField(

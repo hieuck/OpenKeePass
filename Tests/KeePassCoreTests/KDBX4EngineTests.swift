@@ -382,6 +382,9 @@ final class KDBX4EngineTests: XCTestCase {
                         customFields: [
                             KeePassField(name: "TOTP", value: "otpauth://totp/example", isProtected: true),
                             KeePassField(name: "Environment", value: "prod", isProtected: false)
+                        ],
+                        attachments: [
+                            KeePassAttachment(name: "recovery.txt", data: Data("recovery-code".utf8), isProtected: false)
                         ]
                     )
                 ]
@@ -406,6 +409,12 @@ final class KDBX4EngineTests: XCTestCase {
             [
                 KeePassField(name: "Environment", value: "prod", isProtected: false),
                 KeePassField(name: "TOTP", value: "otpauth://totp/example", isProtected: true)
+            ]
+        )
+        XCTAssertEqual(
+            reopened.root.entries.first?.attachments,
+            [
+                KeePassAttachment(name: "recovery.txt", data: Data("recovery-code".utf8), isProtected: false)
             ]
         )
     }

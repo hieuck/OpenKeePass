@@ -94,6 +94,28 @@ final class KeePassXMLParserTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.notes, "notes")
     }
 
+    func testParsesInlineEntryAttachments() throws {
+        let xml = """
+        <KeePassFile>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>Document</Value></String>
+                <Binary><Key>recovery.txt</Key><Value>cmVjb3ZlcnktY29kZQ==</Value></Binary>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """
+
+        let vault = try KeePassXMLParser.parse(Data(xml.utf8))
+
+        XCTAssertEqual(vault.root.entries.first?.attachments, [
+            KeePassAttachment(name: "recovery.txt", data: Data("recovery-code".utf8), isProtected: false)
+        ])
+    }
+
     func testRejectsXMLWithoutRootGroup() {
         XCTAssertThrowsError(try KeePassXMLParser.parse(Data("<KeePassFile/>".utf8))) { error in
             XCTAssertEqual(error as? KDBXError, .corruptDatabase)

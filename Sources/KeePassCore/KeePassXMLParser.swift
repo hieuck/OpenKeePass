@@ -52,6 +52,7 @@ public enum KeePassXMLParser {
             .filter { !standardKeys.contains($0.key) }
             .sorted { $0.key < $1.key }
             .map(\.value)
+        let attachments = try directElements(in: xml, tag: "Binary").compactMap(parseAttachment)
 
         return KeePassEntry(
             id: id,
@@ -60,8 +61,27 @@ public enum KeePassXMLParser {
             password: fields["Password"]?.value ?? "",
             url: fields["URL"]?.value ?? "",
             notes: fields["Notes"]?.value ?? "",
-            customFields: customFields
+            customFields: customFields,
+            attachments: attachments
         )
+    }
+
+    private static func parseAttachment(_ xml: String) throws -> KeePassAttachment? {
+        guard let key = firstText(in: xml, tag: "Key"),
+              let valueElement = firstElement(in: xml, tag: "Value") else {
+            return nil
+        }
+        let valueTag = openingTag(of: valueElement)
+        if valueTag.localizedCaseInsensitiveContains("Ref=") {
+            return nil
+        }
+        let encoded = innerText(of: valueElement)
+        guard let data = Data(base64Encoded: encoded) else {
+            throw KDBXError.corruptDatabase
+        }
+        let isProtected = valueTag.localizedCaseInsensitiveContains("Protected=\"True\"")
+            || valueTag.localizedCaseInsensitiveContains("Protected=\"true\"")
+        return KeePassAttachment(name: key, data: data, isProtected: isProtected)
     }
 
     private static func uuid(from base64: String?) -> UUID? {
@@ -184,6 +204,13 @@ public enum KeePassXMLParser {
             return ""
         }
         return decodeXML(String(content).trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func openingTag(of element: String) -> String {
+        guard let end = element.firstIndex(of: ">") else {
+            return element
+        }
+        return String(element[...end])
     }
 
     private static func decodeXML(_ value: String) -> String {

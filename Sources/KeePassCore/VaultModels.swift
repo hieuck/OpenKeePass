@@ -45,6 +45,27 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
     public var url: String
     public var notes: String
     public var customFields: [KeePassField]
+    public var attachments: [KeePassAttachment]
+
+    public init(
+        id: UUID,
+        title: String,
+        username: String,
+        password: String,
+        url: String,
+        notes: String,
+        customFields: [KeePassField],
+        attachments: [KeePassAttachment] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.username = username
+        self.password = password
+        self.url = url
+        self.notes = notes
+        self.customFields = customFields
+        self.attachments = attachments
+    }
 
     public init(
         id: UUID,
@@ -55,13 +76,16 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         notes: String,
         customFields: [KeePassField]
     ) {
-        self.id = id
-        self.title = title
-        self.username = username
-        self.password = password
-        self.url = url
-        self.notes = notes
-        self.customFields = customFields
+        self.init(
+            id: id,
+            title: title,
+            username: username,
+            password: password,
+            url: url,
+            notes: notes,
+            customFields: customFields,
+            attachments: []
+        )
     }
 
     public func matches(_ normalizedQuery: String) -> Bool {
@@ -83,6 +107,18 @@ public struct KeePassField: Equatable, Sendable {
     public init(name: String, value: String, isProtected: Bool) {
         self.name = name
         self.value = value
+        self.isProtected = isProtected
+    }
+}
+
+public struct KeePassAttachment: Equatable, Sendable {
+    public var name: String
+    public var data: Data
+    public var isProtected: Bool
+
+    public init(name: String, data: Data, isProtected: Bool) {
+        self.name = name
+        self.data = data
         self.isProtected = isProtected
     }
 }
