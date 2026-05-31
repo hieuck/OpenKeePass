@@ -1,0 +1,65 @@
+name: OpenKeePass
+options:
+  minimumXcodeGenVersion: 2.42.0
+  deploymentTarget:
+    iOS: "15.0"
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+packages:
+  OpenKeePassCore:
+    path: .
+targets:
+  OpenKeePass:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - OpenKeePassApp
+    dependencies:
+      - package: OpenKeePassCore
+        product: KeePassCore
+      - package: OpenKeePassCore
+        product: VaultStore
+      - package: OpenKeePassCore
+        product: SecurityKit
+      - package: OpenKeePassCore
+        product: PasswordTools
+      - package: OpenKeePassCore
+        product: SharedUI
+      - target: OpenKeePassAutoFill
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.openkeepass.app
+        INFOPLIST_FILE: OpenKeePassApp/Info.plist
+        CODE_SIGN_STYLE: Automatic
+    entitlements:
+      path: OpenKeePassApp/OpenKeePassApp.entitlements
+  OpenKeePassAutoFill:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - OpenKeePassAutoFill
+    dependencies:
+      - sdk: AuthenticationServices.framework
+      - package: OpenKeePassCore
+        product: KeePassCore
+      - package: OpenKeePassCore
+        product: SecurityKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.openkeepass.app.autofill
+        INFOPLIST_FILE: OpenKeePassAutoFill/Info.plist
+        CODE_SIGN_STYLE: Automatic
+    entitlements:
+      path: OpenKeePassAutoFill/OpenKeePassAutoFill.entitlements
+schemes:
+  OpenKeePass:
+    build:
+      targets:
+        OpenKeePass: all
+    test:
+      gatherCoverageData: true
+      targets: []
