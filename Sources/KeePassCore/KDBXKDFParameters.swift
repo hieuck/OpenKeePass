@@ -82,9 +82,3 @@ public enum KDBXKDFUUID {
         0xFC, 0x3E, 0xC6, 0xF0, 0xA1, 0xE6
     ])
 }
-
-private extension Data {
-    func hexEncodedUppercase() -> String {
-        map { String(format: "%02X", $0) }.joined()
-    }
-}
