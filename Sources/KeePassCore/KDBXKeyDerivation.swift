@@ -83,19 +83,21 @@ public enum KDBXKeyDerivation {
 
         for _ in 0..<rounds {
             var bytesMoved = 0
+            let inputCount = transformed.count
+            let outputCount = output.count
             let updateStatus = transformed.withUnsafeBytes { inputBuffer in
                 output.withUnsafeMutableBytes { outputBuffer in
                     CCCryptorUpdate(
                         cryptor,
                         inputBuffer.baseAddress,
-                        transformed.count,
+                        inputCount,
                         outputBuffer.baseAddress,
-                        output.count,
+                        outputCount,
                         &bytesMoved
                     )
                 }
             }
-            guard updateStatus == kCCSuccess, bytesMoved == transformed.count else {
+            guard updateStatus == kCCSuccess, bytesMoved == inputCount else {
                 throw KDBXError.corruptDatabase
             }
             swap(&transformed, &output)
