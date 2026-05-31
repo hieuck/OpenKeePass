@@ -6,25 +6,68 @@ import VaultStore
 @MainActor
 final class VaultSessionModel: ObservableObject {
     @Published var isUnlocking = false
+    @Published var isSaving = false
+    @Published var isDirty = false
     @Published var vault: KeePassVault?
     @Published var errorMessage: String?
 
+    private let fileURL: URL
     private let store = VaultStore(engine: KDBX4Engine())
+    private var credentials: KDBXCredentials?
+
+    init(fileURL: URL) {
+        self.fileURL = fileURL
+    }
 
     func unlock(data: Data, password: String) async throws {
         isUnlocking = true
         vault = nil
+        isDirty = false
         errorMessage = nil
         defer {
             isUnlocking = false
         }
 
         do {
-            try await store.unlock(data: data, credentials: KDBXCredentials(password: password))
+            let credentials = KDBXCredentials(password: password)
+            try await store.unlock(data: data, credentials: credentials)
+            self.credentials = credentials
             vault = store.unlockedVault
+            isDirty = store.isDirty
         } catch {
             errorMessage = UnlockErrorMessage.describe(error)
             throw error
+        }
+    }
+
+    func save() async {
+        guard let credentials else {
+            errorMessage = "Unlock this vault before saving."
+            return
+        }
+
+        isSaving = true
+        errorMessage = nil
+        defer {
+            isSaving = false
+        }
+
+        let canAccess = fileURL.startAccessingSecurityScopedResource()
+        guard canAccess else {
+            errorMessage = "OpenKeePass could not access this file. Re-select it from Files."
+            return
+        }
+        defer {
+            fileURL.stopAccessingSecurityScopedResource()
+        }
+
+        do {
+            let data = try await store.save(credentials: credentials)
+            try data.write(to: fileURL, options: .atomic)
+            vault = store.unlockedVault
+            isDirty = store.isDirty
+        } catch {
+            errorMessage = "Could not save this vault."
         }
     }
 
@@ -32,6 +75,7 @@ final class VaultSessionModel: ObservableObject {
         do {
             try store.addEntry(entry, toGroup: groupID)
             vault = store.unlockedVault
+            isDirty = store.isDirty
         } catch {
             errorMessage = "Could not add this entry."
         }
@@ -43,6 +87,7 @@ final class VaultSessionModel: ObservableObject {
                 current = entry
             }
             vault = store.unlockedVault
+            isDirty = store.isDirty
         } catch {
             errorMessage = "Could not update this entry."
         }

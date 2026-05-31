@@ -6,7 +6,12 @@ struct UnlockView: View {
     let vault: VaultReference
     @State private var password = ""
     @State private var errorMessage: String?
-    @StateObject private var model = VaultSessionModel()
+    @StateObject private var model: VaultSessionModel
+
+    init(vault: VaultReference) {
+        self.vault = vault
+        _model = StateObject(wrappedValue: VaultSessionModel(fileURL: vault.url))
+    }
 
     var body: some View {
         Form {

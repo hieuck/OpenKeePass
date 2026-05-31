@@ -32,6 +32,13 @@ private struct GroupContentView: View {
 
     var body: some View {
         List {
+            if let errorMessage = model.errorMessage {
+                Section {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                }
+            }
+
             if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !group.groups.isEmpty {
                 Section("Groups") {
                     ForEach(group.groups) { child in
@@ -61,12 +68,28 @@ private struct GroupContentView: View {
         .searchable(text: $searchText)
         .navigationTitle(group.title.isEmpty ? vaultName : group.title)
         .toolbar {
-            NavigationLink(destination: EntryEditorView(entry: nil) { entry in
-                model.addEntry(entry, toGroup: group.id)
-            }) {
-                Image(systemName: "plus")
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button {
+                    Task {
+                        await model.save()
+                    }
+                } label: {
+                    if model.isSaving {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "square.and.arrow.down")
+                    }
+                }
+                .disabled(!model.isDirty || model.isSaving)
+                .accessibilityLabel("Save Vault")
+
+                NavigationLink(destination: EntryEditorView(entry: nil) { entry in
+                    model.addEntry(entry, toGroup: group.id)
+                }) {
+                    Image(systemName: "plus")
+                }
+                .accessibilityLabel("Add Entry")
             }
-            .accessibilityLabel("Add Entry")
         }
     }
 }
