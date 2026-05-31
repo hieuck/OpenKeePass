@@ -5,14 +5,42 @@ public struct KDBXHeader: Equatable, Sendable {
         case kdbx
     }
 
+    public enum Compression: Equatable, Sendable {
+        case none
+        case gzip
+        case unknown(UInt32)
+    }
+
     public var fileSignature: FileSignature
     public var majorVersion: UInt16
     public var minorVersion: UInt16
+    public var cipherID: Data?
+    public var compression: Compression?
+    public var masterSeed: Data?
+    public var encryptionIV: Data?
+    public var kdfParameters: Data?
+    public var headerByteCount: Int
 
-    public init(fileSignature: FileSignature, majorVersion: UInt16, minorVersion: UInt16) {
+    public init(
+        fileSignature: FileSignature,
+        majorVersion: UInt16,
+        minorVersion: UInt16,
+        cipherID: Data? = nil,
+        compression: Compression? = nil,
+        masterSeed: Data? = nil,
+        encryptionIV: Data? = nil,
+        kdfParameters: Data? = nil,
+        headerByteCount: Int = 12
+    ) {
         self.fileSignature = fileSignature
         self.majorVersion = majorVersion
         self.minorVersion = minorVersion
+        self.cipherID = cipherID
+        self.compression = compression
+        self.masterSeed = masterSeed
+        self.encryptionIV = encryptionIV
+        self.kdfParameters = kdfParameters
+        self.headerByteCount = headerByteCount
     }
 
     public static func parse(_ data: Data) throws -> KDBXHeader {
@@ -28,19 +56,72 @@ public struct KDBXHeader: Equatable, Sendable {
 
         let minorVersion = data.littleEndianUInt16(at: 8)
         let majorVersion = data.littleEndianUInt16(at: 10)
-        return KDBXHeader(fileSignature: .kdbx, majorVersion: majorVersion, minorVersion: minorVersion)
-    }
-}
+        var header = KDBXHeader(fileSignature: .kdbx, majorVersion: majorVersion, minorVersion: minorVersion)
 
-private extension Data {
-    func littleEndianUInt16(at offset: Int) -> UInt16 {
-        UInt16(self[offset]) | (UInt16(self[offset + 1]) << 8)
+        if majorVersion == 4, data.count > 12 {
+            try header.parseKDBX4Fields(from: data)
+        }
+
+        return header
     }
 
-    func littleEndianUInt32(at offset: Int) -> UInt32 {
-        UInt32(self[offset])
-            | (UInt32(self[offset + 1]) << 8)
-            | (UInt32(self[offset + 2]) << 16)
-            | (UInt32(self[offset + 3]) << 24)
+    private mutating func parseKDBX4Fields(from data: Data) throws {
+        var offset = 12
+        while offset < data.count {
+            let fieldID = data[offset]
+            offset += 1
+
+            guard offset + 4 <= data.count else {
+                throw KDBXError.truncatedHeader
+            }
+
+            let length = Int(data.littleEndianUInt32(at: offset))
+            offset += 4
+
+            guard offset + length <= data.count else {
+                throw KDBXError.truncatedHeader
+            }
+
+            let payload = data.subdata(in: offset..<(offset + length))
+            offset += length
+
+            if fieldID == 0 {
+                headerByteCount = offset
+                return
+            }
+
+            apply(fieldID: fieldID, payload: payload)
+        }
+
+        throw KDBXError.truncatedHeader
+    }
+
+    private mutating func apply(fieldID: UInt8, payload: Data) {
+        switch fieldID {
+        case 2:
+            cipherID = payload
+        case 3:
+            guard payload.count >= 4 else {
+                compression = nil
+                return
+            }
+            let raw = payload.littleEndianUInt32(at: 0)
+            switch raw {
+            case 0:
+                compression = Compression.none
+            case 1:
+                compression = .gzip
+            default:
+                compression = .unknown(raw)
+            }
+        case 4:
+            masterSeed = payload
+        case 7:
+            encryptionIV = payload
+        case 11:
+            kdfParameters = payload
+        default:
+            break
+        }
     }
 }
