@@ -43,7 +43,7 @@ public struct KDBX4Engine: KDBXEngine {
             return try KeePassXMLParser.parse(xml, protectedStream: innerHeader.protectedStream)
         }
 
-        throw KDBXError.unsupportedFeature("KDBX 4 payload decryption is not implemented yet")
+        throw KDBXError.unsupportedFeature("KDBX 4 payload is incomplete or unsupported")
     }
 
     public func create(name: String, credentials: KDBXCredentials) async throws -> KeePassVault {

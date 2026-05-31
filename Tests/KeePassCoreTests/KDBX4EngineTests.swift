@@ -25,26 +25,26 @@ final class KDBX4EngineTests: XCTestCase {
         }
     }
 
-    func testOpenReportsKDBX4PayloadParsingAsUnsupportedUntilCryptoIsImplemented() async {
+    func testOpenReportsIncompleteKDBX4PayloadAsUnsupported() async {
         let engine = KDBX4Engine()
 
         do {
             _ = try await engine.open(data: .kdbxHeader(major: 4, minor: 0), credentials: .init(password: "pw"))
-            XCTFail("Expected KDBX4 payload to throw until crypto is implemented")
+            XCTFail("Expected incomplete KDBX4 payload to throw")
         } catch {
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload decryption is not implemented yet"))
+            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload is incomplete or unsupported"))
         }
     }
 
-    func testOpenWithAESKDFHeaderDerivesKeyBeforePayloadDecrypt() async {
+    func testOpenWithAESKDFHeaderRejectsMissingPayload() async {
         let engine = KDBX4Engine()
         let data = Data.kdbx4AESHeader()
 
         do {
             _ = try await engine.open(data: data, credentials: .init(password: "pw"))
-            XCTFail("Expected payload decrypt to remain unsupported")
+            XCTFail("Expected missing payload to throw")
         } catch {
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload decryption is not implemented yet"))
+            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload is incomplete or unsupported"))
         }
     }
 
@@ -277,15 +277,15 @@ final class KDBX4EngineTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.password, "zip-pass")
     }
 
-    func testOpenWithArgon2HeaderDerivesKeyBeforePayloadDecrypt() async {
+    func testOpenWithArgon2HeaderRejectsMissingPayload() async {
         let engine = KDBX4Engine()
         let data = Data.kdbx4Argon2Header()
 
         do {
             _ = try await engine.open(data: data, credentials: .init(password: "pw"))
-            XCTFail("Expected payload decrypt to remain unsupported")
+            XCTFail("Expected missing payload to throw")
         } catch {
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload decryption is not implemented yet"))
+            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX 4 payload is incomplete or unsupported"))
         }
     }
 
