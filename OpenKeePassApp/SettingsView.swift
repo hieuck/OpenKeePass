@@ -26,7 +26,7 @@ struct SettingsView: View {
                     Text("0.1.0")
                         .foregroundColor(.secondary)
                 }
-                Text("All shipped features are free. No subscriptions, ads, telemetry, or paywalls.")
+                Text("All shipped features are free. No paid tiers.")
                     .foregroundColor(.secondary)
             }
         }
