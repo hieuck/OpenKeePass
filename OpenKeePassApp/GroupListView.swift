@@ -2,22 +2,40 @@ import KeePassCore
 import SwiftUI
 
 struct GroupListView: View {
+    let vault: KeePassVault
+
+    var body: some View {
+        GroupContentView(vaultName: vault.name, group: vault.root)
+    }
+}
+
+private struct GroupContentView: View {
     let vaultName: String
+    let group: KeePassGroup
     @State private var searchText = ""
-    @State private var entries = SampleVault.entries
 
     var filteredEntries: [KeePassEntry] {
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return entries
+            return group.entries
         }
-        return entries.filter { entry in
+        return group.flattenedEntries().filter { entry in
             entry.matches(searchText.lowercased())
         }
     }
 
     var body: some View {
         List {
-            Section(vaultName) {
+            if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !group.groups.isEmpty {
+                Section("Groups") {
+                    ForEach(group.groups) { child in
+                        NavigationLink(destination: GroupContentView(vaultName: vaultName, group: child)) {
+                            Label(child.title, systemImage: "folder")
+                        }
+                    }
+                }
+            }
+
+            Section("Entries") {
                 ForEach(filteredEntries) { entry in
                     NavigationLink(destination: EntryDetailView(entry: entry)) {
                         VStack(alignment: .leading, spacing: 4) {
@@ -34,7 +52,7 @@ struct GroupListView: View {
             }
         }
         .searchable(text: $searchText)
-        .navigationTitle(vaultName)
+        .navigationTitle(group.title.isEmpty ? vaultName : group.title)
         .toolbar {
             NavigationLink(destination: EntryEditorView(entry: nil)) {
                 Image(systemName: "plus")
@@ -42,18 +60,4 @@ struct GroupListView: View {
             .accessibilityLabel("Add Entry")
         }
     }
-}
-
-private enum SampleVault {
-    static let entries: [KeePassEntry] = [
-        KeePassEntry(
-            id: UUID(),
-            title: "Example",
-            username: "user@example.com",
-            password: "password",
-            url: "https://example.com",
-            notes: "Sample entry until KDBX engine is connected.",
-            customFields: []
-        )
-    ]
 }

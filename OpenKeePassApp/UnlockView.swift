@@ -37,9 +37,9 @@ struct UnlockView: View {
                 }
             }
 
-            if model.isUnlocked {
+            if let unlockedVault = model.vault {
                 Section {
-                    NavigationLink("Open Vault", destination: GroupListView(vaultName: vault.url.deletingPathExtension().lastPathComponent))
+                    NavigationLink("Open Vault", destination: GroupListView(vault: unlockedVault))
                 }
             }
         }
@@ -68,14 +68,14 @@ struct UnlockView: View {
 @MainActor
 private final class UnlockModel: ObservableObject {
     @Published var isUnlocking = false
-    @Published var isUnlocked = false
+    @Published var vault: KeePassVault?
     @Published var errorMessage: String?
 
     private let store = VaultStore(engine: KDBX4Engine())
 
     func unlock(data: Data, password: String) async throws {
         isUnlocking = true
-        isUnlocked = false
+        vault = nil
         errorMessage = nil
         defer {
             isUnlocking = false
@@ -83,7 +83,7 @@ private final class UnlockModel: ObservableObject {
 
         do {
             try await store.unlock(data: data, credentials: KDBXCredentials(password: password))
-            isUnlocked = true
+            vault = store.unlockedVault
         } catch {
             errorMessage = UnlockErrorMessage.describe(error)
             throw error
