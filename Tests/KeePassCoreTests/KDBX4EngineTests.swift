@@ -147,6 +147,69 @@ final class KDBX4EngineTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.password, "pass")
     }
 
+    func testOpenWithGzipCompressedKDBX4PayloadReturnsParsedVault() async throws {
+        let engine = KDBX4Engine()
+        let credentials = KDBXCredentials(password: "pw")
+        let masterSeed = Data(repeating: 0xA5, count: 32)
+        let transformSeed = Data(repeating: 0x01, count: 32)
+        let iv = Data(repeating: 0x02, count: 16)
+        let composite = try KDBXCompositeKey.material(from: credentials)
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: .aes(seed: transformSeed, rounds: 1))
+        let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
+        let compressedXML = Data([
+            0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xFF, 0x8D, 0x50,
+            0x4B, 0x0A, 0xC2, 0x30, 0x14, 0xDC, 0x7B, 0x8A, 0x5E, 0x40, 0xDE, 0x05,
+            0x86, 0x6C, 0xFC, 0x2D, 0x8A, 0x22, 0xFE, 0x16, 0xEE, 0x9E, 0xF4, 0x21,
+            0x81, 0xD6, 0x84, 0x24, 0x45, 0xEA, 0xE9, 0x4D, 0x5A, 0xAB, 0x16, 0x15,
+            0xDC, 0xCD, 0x64, 0x3E, 0x8F, 0x0C, 0x72, 0x91, 0x35, 0x7B, 0x3F, 0xD7,
+            0xA5, 0xA8, 0x51, 0x96, 0x61, 0x29, 0x81, 0x15, 0xA6, 0x1C, 0xF8, 0xC4,
+            0x5E, 0x56, 0x5C, 0x89, 0x9A, 0x98, 0xCA, 0x3A, 0xF1, 0x5E, 0x0A, 0xD0,
+            0x40, 0x00, 0xB5, 0xEE, 0x14, 0xDB, 0x18, 0x13, 0x12, 0x88, 0x70, 0xE1,
+            0x4C, 0x6D, 0x3B, 0x1C, 0x59, 0x6B, 0x4C, 0x2A, 0xA8, 0x85, 0xFD, 0xFB,
+            0xEC, 0x12, 0x5C, 0xD3, 0xB3, 0xC8, 0xB7, 0xC1, 0xE9, 0xCB, 0x59, 0x21,
+            0x97, 0x46, 0xED, 0x74, 0x28, 0x05, 0x94, 0x20, 0x0E, 0x5C, 0xD6, 0xA2,
+            0x8E, 0xDA, 0x82, 0x3A, 0x08, 0x7A, 0x58, 0xBF, 0x67, 0xF7, 0x5E, 0x5C,
+            0x3A, 0x34, 0x88, 0xDF, 0xB4, 0x1D, 0xD7, 0x51, 0xF8, 0xB3, 0x23, 0x0D,
+            0x72, 0x35, 0xAE, 0xF8, 0xE8, 0xB0, 0x51, 0xF8, 0xD5, 0x01, 0x7A, 0xFB,
+            0x12, 0xE8, 0xB9, 0x02, 0xA8, 0xDB, 0x26, 0x95, 0xBD, 0xA6, 0xBE, 0x03,
+            0xEF, 0xAF, 0xE6, 0x97, 0x78, 0x01, 0x00, 0x00
+        ])
+        var plaintext = Data()
+        plaintext.appendInnerHeaderField(id: 1, payload: Data([0x02]))
+        plaintext.appendInnerHeaderField(id: 2, payload: Data(repeating: 0xA5, count: 32))
+        plaintext.appendInnerHeaderField(id: 0, payload: Data())
+        plaintext.append(compressedXML)
+        let paddingLength = 16 - (plaintext.count % 16)
+        let ciphertext = try AES256(key: finalKey).encryptCBC(
+            plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
+            iv: iv
+        )
+
+        var framedPayload = Data()
+        framedPayload.appendKDBX4Block(index: 0, payload: ciphertext) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+        framedPayload.appendKDBX4Block(index: 1, payload: Data()) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+
+        var data = Data.kdbx4AESHeader(masterSeed: masterSeed, transformSeed: transformSeed, iv: iv, compression: 1)
+        let header = data
+        data.append(SHA256.hash(header))
+        data.append(HMACSHA256.authenticate(
+            message: header,
+            key: KDBX4HMACKeyDerivation.headerKey(masterSeed: masterSeed, transformedKey: transformed)
+        ))
+        data.append(framedPayload)
+
+        let vault = try await engine.open(data: data, credentials: credentials)
+
+        XCTAssertEqual(vault.name, "Compressed")
+        XCTAssertEqual(vault.root.entries.first?.title, "Zip")
+        XCTAssertEqual(vault.root.entries.first?.username, "zip-user")
+        XCTAssertEqual(vault.root.entries.first?.password, "zip-pass")
+    }
+
     func testOpenWithArgon2HeaderDerivesKeyBeforePayloadDecrypt() async {
         let engine = KDBX4Engine()
         let data = Data.kdbx4Argon2Header()
@@ -240,13 +303,14 @@ private extension Data {
         masterSeed: Data = Data(repeating: 0xA5, count: 32),
         transformSeed: Data = Data(repeating: 0x01, count: 32),
         iv: Data = Data(repeating: 0x02, count: 16),
+        compression: UInt32? = nil,
         payload: Data = Data()
     ) -> Data {
         kdbx4Header(kdfParameters: .variantDictionary([
             .bytes("$UUID", KDBXKDFUUID.aesKDF),
             .bytes("S", transformSeed),
             .uint64("R", 1)
-        ]), masterSeed: masterSeed, cipherID: KDBXCipherID.aes256, iv: iv, payload: payload)
+        ]), masterSeed: masterSeed, cipherID: KDBXCipherID.aes256, compression: compression, iv: iv, payload: payload)
     }
 
     static func kdbx4Argon2Header(
@@ -268,12 +332,18 @@ private extension Data {
         kdfParameters: Data,
         masterSeed: Data = Data(repeating: 0xA5, count: 32),
         cipherID: Data? = nil,
+        compression: UInt32? = nil,
         iv: Data? = nil,
         payload: Data = Data()
     ) -> Data {
         var data = kdbxHeader(major: 4, minor: 0)
         if let cipherID {
             data.appendField(id: 2, payload: cipherID)
+        }
+        if let compression {
+            var compressionPayload = Data()
+            compressionPayload.appendUInt32LE(compression)
+            data.appendField(id: 3, payload: compressionPayload)
         }
         data.appendField(id: 4, payload: masterSeed)
         if let iv {

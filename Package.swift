@@ -13,12 +13,18 @@ let package = Package(
     ],
     targets: [
         .target(name: "KeePassCore", dependencies: [
-            "CArgon2"
+            "CArgon2",
+            "CMiniz"
         ]),
         .target(
             name: "CArgon2",
             path: "Sources/CArgon2",
             exclude: ["src/genkat.c"],
+            publicHeadersPath: "include"
+        ),
+        .target(
+            name: "CMiniz",
+            path: "Sources/CMiniz",
             publicHeadersPath: "include"
         ),
         .target(name: "VaultStore", dependencies: ["KeePassCore", "SecurityKit"]),
