@@ -1,0 +1,69 @@
+name: iOS
+
+on:
+  push:
+    branches:
+      - master
+      - "codex/**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Package IPA
+    runs-on: macos-15
+    env:
+      DERIVED_DATA: ${{ github.workspace }}/DerivedData
+      BUILD_DIR: ${{ github.workspace }}/build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run Swift package tests
+        run: swift test
+
+      - name: Build app and extension for iOS
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project OpenKeePass.xcodeproj \
+            -scheme OpenKeePass \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee "$BUILD_DIR-xcodebuild.log"
+
+      - name: Package unsigned IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="$(find "$DERIVED_DATA/Build/Products/Release-iphoneos" -maxdepth 1 -name 'OpenKeePass.app' -type d | head -n 1)"
+          test -n "$APP_PATH"
+          rm -rf "$BUILD_DIR/Payload"
+          mkdir -p "$BUILD_DIR/Payload"
+          cp -R "$APP_PATH" "$BUILD_DIR/Payload/OpenKeePass.app"
+          (cd "$BUILD_DIR" && zip -qry OpenKeePass-unsigned.ipa Payload)
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenKeePass-unsigned-ipa
+          path: build/OpenKeePass-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: OpenKeePass-build-log
+          path: build-xcodebuild.log
+          if-no-files-found: warn
