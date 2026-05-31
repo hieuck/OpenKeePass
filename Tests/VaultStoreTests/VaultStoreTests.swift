@@ -20,6 +20,15 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertEqual(store.state, .unlocked(vault: vault, isDirty: false))
     }
 
+    func testCreateUnlocksNewVaultAndMarksItDirty() async throws {
+        let vault = KeePassVault.fixture(name: "New Vault")
+        let store = VaultStore(engine: FakeKDBXEngine(createResult: .success(vault)))
+
+        try await store.create(name: "New Vault", credentials: .init(password: "pw"))
+
+        XCTAssertEqual(store.state, .unlocked(vault: vault, isDirty: true))
+    }
+
     func testEditingEntryMarksVaultDirty() async throws {
         let entry = KeePassEntry.fixture(title: "GitHub", username: "old")
         let vault = KeePassVault.fixture(entries: [entry])

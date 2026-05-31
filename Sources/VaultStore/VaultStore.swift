@@ -40,6 +40,11 @@ public final class VaultStore {
         state = .unlocked(vault: vault, isDirty: false)
     }
 
+    public func create(name: String, credentials: KDBXCredentials) async throws {
+        let vault = try await engine.create(name: name, credentials: credentials)
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
     public func lock() {
         state = .locked
     }
