@@ -114,6 +114,10 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         return updated
     }
 
+    public var displayableCustomFields: [KeePassField] {
+        customFields.filter { !$0.isOneTimePasswordConfigurationField }
+    }
+
     private var searchableValues: [String] {
         [title, username, url, notes] + customFields.map(\.value)
     }
@@ -128,6 +132,25 @@ public struct KeePassField: Equatable, Sendable {
         self.name = name
         self.value = value
         self.isProtected = isProtected
+    }
+
+    public var displayValue: String {
+        isProtected ? "••••••••" : value
+    }
+
+    public var copyValue: String {
+        value
+    }
+
+    public var isOneTimePasswordConfigurationField: Bool {
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let normalizedValue = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalizedName == "otp"
+            || normalizedName == "totp"
+            || normalizedName == "timeotp-secret"
+            || normalizedName == "timeotp-length"
+            || normalizedName == "timeotp-period"
+            || normalizedValue.hasPrefix("otpauth://totp/")
     }
 }
 

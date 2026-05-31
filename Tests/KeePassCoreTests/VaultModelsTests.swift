@@ -89,6 +89,24 @@ final class VaultModelsTests: XCTestCase {
         )
     }
 
+    func testDisplayableCustomFieldsExcludeTOTPSecrets() {
+        let entry = KeePassEntry.fixture(title: "GitHub", customFields: [
+            KeePassField(name: "email", value: "octo@example.com", isProtected: false),
+            KeePassField(name: "otp", value: "otpauth://totp/GitHub:octo?secret=GEZDGNBVGY3TQOJQ", isProtected: true),
+            KeePassField(name: "TimeOtp-Secret", value: "GEZDGNBVGY3TQOJQ", isProtected: true),
+            KeePassField(name: "Recovery Hint", value: "safe", isProtected: false)
+        ])
+
+        XCTAssertEqual(entry.displayableCustomFields.map(\.name), ["email", "Recovery Hint"])
+    }
+
+    func testProtectedCustomFieldDisplayValueIsMaskedButCopyValueIsRaw() {
+        let field = KeePassField(name: "API Token", value: "token-secret", isProtected: true)
+
+        XCTAssertEqual(field.displayValue, "••••••••")
+        XCTAssertEqual(field.copyValue, "token-secret")
+    }
+
     func testSearchMatchesNestedEntriesByCommonFields() {
         let matchingByURL = KeePassEntry.fixture(title: "Source", url: "https://github.com/openkeepass")
         let matchingByCustomField = KeePassEntry.fixture(title: "Server", customFields: [.init(name: "host", value: "vault.internal", isProtected: false)])

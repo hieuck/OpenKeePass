@@ -39,6 +39,10 @@ struct EntryDetailView: View {
                     OneTimePasswordSection(configuration: otpConfiguration)
                 }
 
+                if !entry.displayableCustomFields.isEmpty {
+                    CustomFieldsSection(fields: entry.displayableCustomFields)
+                }
+
                 if !entry.attachments.isEmpty {
                     AttachmentSection(attachments: entry.attachments)
                 }
@@ -54,6 +58,33 @@ struct EntryDetailView: View {
             Text("This entry is no longer available.")
                 .foregroundColor(.secondary)
                 .navigationTitle("Entry")
+        }
+    }
+}
+
+private struct CustomFieldsSection: View {
+    let fields: [KeePassField]
+
+    var body: some View {
+        Section("Custom Fields") {
+            ForEach(Array(fields.enumerated()), id: \.offset) { _, field in
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(field.name)
+                        Text(field.displayValue)
+                            .font(field.isProtected ? .body.monospaced() : .body)
+                            .foregroundColor(.secondary)
+                            .textSelection(field.isProtected ? .disabled : .enabled)
+                    }
+                    Spacer()
+                    Button {
+                        UIPasteboard.general.string = field.copyValue
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .accessibilityLabel("Copy \(field.name)")
+                }
+            }
         }
     }
 }
