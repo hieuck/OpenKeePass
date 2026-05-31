@@ -48,6 +48,31 @@ final class KDBX4EngineTests: XCTestCase {
         }
     }
 
+    func testOpenWithAESKDFHeaderAndPayloadDecryptsBeforeXMLParsing() async throws {
+        let engine = KDBX4Engine()
+        let credentials = KDBXCredentials(password: "pw")
+        let masterSeed = Data(repeating: 0xA5, count: 32)
+        let transformSeed = Data(repeating: 0x01, count: 32)
+        let iv = Data(repeating: 0x02, count: 16)
+        let composite = try KDBXCompositeKey.material(from: credentials)
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: .aes(seed: transformSeed, rounds: 1))
+        let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
+        let plaintext = Data("<KeePassFile/>".utf8)
+        let paddingLength = 16 - (plaintext.count % 16)
+        let ciphertext = try AES256(key: finalKey).encryptCBC(
+            plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
+            iv: iv
+        )
+        let data = Data.kdbx4AESHeader(masterSeed: masterSeed, transformSeed: transformSeed, iv: iv, payload: ciphertext)
+
+        do {
+            _ = try await engine.open(data: data, credentials: credentials)
+            XCTFail("Expected XML parsing to remain unsupported")
+        } catch {
+            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX XML parsing is not implemented yet"))
+        }
+    }
+
     func testOpenWithArgon2HeaderReportsKDFUnsupported() async {
         let engine = KDBX4Engine()
         let data = Data.kdbx4Argon2Header()
@@ -74,12 +99,17 @@ private extension Data {
         return data
     }
 
-    static func kdbx4AESHeader() -> Data {
+    static func kdbx4AESHeader(
+        masterSeed: Data = Data(repeating: 0xA5, count: 32),
+        transformSeed: Data = Data(repeating: 0x01, count: 32),
+        iv: Data = Data(repeating: 0x02, count: 16),
+        payload: Data = Data()
+    ) -> Data {
         kdbx4Header(kdfParameters: .variantDictionary([
             .bytes("$UUID", KDBXKDFUUID.aesKDF),
-            .bytes("S", Data(repeating: 0x01, count: 32)),
+            .bytes("S", transformSeed),
             .uint64("R", 1)
-        ]))
+        ]), masterSeed: masterSeed, cipherID: KDBXCipherID.aes256, iv: iv, payload: payload)
     }
 
     static func kdbx4Argon2Header() -> Data {
@@ -93,11 +123,24 @@ private extension Data {
         ]))
     }
 
-    static func kdbx4Header(kdfParameters: Data) -> Data {
+    static func kdbx4Header(
+        kdfParameters: Data,
+        masterSeed: Data = Data(repeating: 0xA5, count: 32),
+        cipherID: Data? = nil,
+        iv: Data? = nil,
+        payload: Data = Data()
+    ) -> Data {
         var data = kdbxHeader(major: 4, minor: 0)
-        data.appendField(id: 4, payload: Data(repeating: 0xA5, count: 32))
+        if let cipherID {
+            data.appendField(id: 2, payload: cipherID)
+        }
+        data.appendField(id: 4, payload: masterSeed)
+        if let iv {
+            data.appendField(id: 7, payload: iv)
+        }
         data.appendField(id: 11, payload: kdfParameters)
         data.appendField(id: 0, payload: Data())
+        data.append(payload)
         return data
     }
 

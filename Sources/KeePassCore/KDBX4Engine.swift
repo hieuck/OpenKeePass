@@ -9,13 +9,28 @@ public struct KDBX4Engine: KDBXEngine {
             throw KDBXError.unsupportedFeature("KDBX \(header.majorVersion).\(header.minorVersion) is not supported by KDBX4Engine")
         }
 
+        var finalKey: Data?
         if let kdfParametersData = header.kdfParameters,
            let masterSeed = header.masterSeed {
             let dictionary = try KDBXVariantDictionary.parse(kdfParametersData)
             let kdfParameters = try KDBXKDFParameters(dictionary: dictionary)
             let compositeKey = try KDBXCompositeKey.material(from: credentials)
             let transformedKey = try KDBXKeyDerivation.transform(compositeKey: compositeKey, parameters: kdfParameters)
-            _ = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformedKey)
+            finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformedKey)
+        }
+
+        let encryptedPayload = data.suffix(from: header.headerByteCount)
+        if !encryptedPayload.isEmpty,
+           let cipherID = header.cipherID,
+           let encryptionIV = header.encryptionIV,
+           let finalKey {
+            _ = try KDBXPayloadDecryptor.decrypt(
+                ciphertext: Data(encryptedPayload),
+                cipherID: cipherID,
+                finalKey: finalKey,
+                encryptionIV: encryptionIV
+            )
+            throw KDBXError.unsupportedFeature("KDBX XML parsing is not implemented yet")
         }
 
         throw KDBXError.unsupportedFeature("KDBX 4 payload decryption is not implemented yet")
