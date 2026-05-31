@@ -65,6 +65,48 @@ final class VaultStoreTests: XCTestCase {
             XCTAssertEqual(store.isDirty, true)
         }
     }
+
+    func testAddingEntryToNestedGroupMarksVaultDirty() async throws {
+        let nestedGroup = KeePassGroup.fixture(title: "Work")
+        let vault = KeePassVault.fixture(groups: [nestedGroup])
+        let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))
+        let entry = KeePassEntry.fixture(title: "Admin")
+        try await store.unlock(data: Data([1]), credentials: .init(password: "pw"))
+
+        try store.addEntry(entry, toGroup: nestedGroup.id)
+
+        let unlocked = try XCTUnwrap(store.unlockedVault)
+        XCTAssertEqual(unlocked.root.groups.first?.entries, [entry])
+        XCTAssertEqual(store.isDirty, true)
+    }
+
+    func testDeletingEntryFromNestedGroupMarksVaultDirty() async throws {
+        let entry = KeePassEntry.fixture(title: "Admin")
+        let nestedGroup = KeePassGroup.fixture(title: "Work", entries: [entry])
+        let vault = KeePassVault.fixture(groups: [nestedGroup])
+        let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))
+        try await store.unlock(data: Data([1]), credentials: .init(password: "pw"))
+
+        try store.deleteEntry(id: entry.id)
+
+        let unlocked = try XCTUnwrap(store.unlockedVault)
+        XCTAssertEqual(unlocked.root.groups.first?.entries, [])
+        XCTAssertEqual(store.isDirty, true)
+    }
+
+    func testAddingAndDeletingGroupMarksVaultDirty() async throws {
+        let vault = KeePassVault.fixture()
+        let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))
+        let group = KeePassGroup.fixture(title: "Personal")
+        try await store.unlock(data: Data([1]), credentials: .init(password: "pw"))
+
+        try store.addGroup(group, toParent: vault.root.id)
+        try store.deleteGroup(id: group.id)
+
+        let unlocked = try XCTUnwrap(store.unlockedVault)
+        XCTAssertEqual(unlocked.root.groups, [])
+        XCTAssertEqual(store.isDirty, true)
+    }
 }
 
 private struct FakeKDBXEngine: KDBXEngine {
@@ -86,16 +128,31 @@ private struct FakeKDBXEngine: KDBXEngine {
 }
 
 private extension KeePassVault {
-    static func fixture(name: String = "Test", entries: [KeePassEntry] = []) -> KeePassVault {
+    static func fixture(
+        name: String = "Test",
+        groups: [KeePassGroup] = [],
+        entries: [KeePassEntry] = []
+    ) -> KeePassVault {
         KeePassVault(
             id: UUID(uuidString: "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA")!,
             name: name,
             root: KeePassGroup(
                 id: UUID(uuidString: "BBBBBBBB-BBBB-BBBB-BBBB-BBBBBBBBBBBB")!,
                 title: "Root",
-                groups: [],
+                groups: groups,
                 entries: entries
             )
+        )
+    }
+}
+
+private extension KeePassGroup {
+    static func fixture(title: String, entries: [KeePassEntry] = []) -> KeePassGroup {
+        KeePassGroup(
+            id: UUID(),
+            title: title,
+            groups: [],
+            entries: entries
         )
     }
 }

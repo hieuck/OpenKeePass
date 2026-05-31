@@ -9,6 +9,7 @@ public enum VaultState: Equatable, Sendable {
 public enum VaultStoreError: Error, Equatable, Sendable {
     case noUnlockedVault
     case entryNotFound(UUID)
+    case groupNotFound(UUID)
 }
 
 @MainActor
@@ -53,6 +54,46 @@ public final class VaultStore {
         state = .unlocked(vault: vault, isDirty: true)
     }
 
+    public func addEntry(_ entry: KeePassEntry, toGroup groupID: UUID) throws {
+        guard case .unlocked(var vault, _) = state else {
+            throw VaultStoreError.noUnlockedVault
+        }
+        guard vault.root.addEntry(entry, toGroup: groupID) else {
+            throw VaultStoreError.groupNotFound(groupID)
+        }
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
+    public func deleteEntry(id: UUID) throws {
+        guard case .unlocked(var vault, _) = state else {
+            throw VaultStoreError.noUnlockedVault
+        }
+        guard vault.root.deleteEntry(id: id) else {
+            throw VaultStoreError.entryNotFound(id)
+        }
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
+    public func addGroup(_ group: KeePassGroup, toParent parentID: UUID) throws {
+        guard case .unlocked(var vault, _) = state else {
+            throw VaultStoreError.noUnlockedVault
+        }
+        guard vault.root.addGroup(group, toParent: parentID) else {
+            throw VaultStoreError.groupNotFound(parentID)
+        }
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
+    public func deleteGroup(id: UUID) throws {
+        guard case .unlocked(var vault, _) = state else {
+            throw VaultStoreError.noUnlockedVault
+        }
+        guard vault.root.deleteGroup(id: id) else {
+            throw VaultStoreError.groupNotFound(id)
+        }
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
     public func save(credentials: KDBXCredentials) async throws -> Data {
         guard case .unlocked(let vault, _) = state else {
             throw VaultStoreError.noUnlockedVault
@@ -64,6 +105,21 @@ public final class VaultStore {
 }
 
 private extension KeePassGroup {
+    mutating func addEntry(_ entry: KeePassEntry, toGroup groupID: UUID) -> Bool {
+        if id == groupID {
+            entries.append(entry)
+            return true
+        }
+
+        for groupIndex in groups.indices {
+            if groups[groupIndex].addEntry(entry, toGroup: groupID) {
+                return true
+            }
+        }
+
+        return false
+    }
+
     mutating func updateEntry(id: UUID, mutate: (inout KeePassEntry) -> Void) -> Bool {
         if let entryIndex = entries.firstIndex(where: { $0.id == id }) {
             mutate(&entries[entryIndex])
@@ -72,6 +128,51 @@ private extension KeePassGroup {
 
         for groupIndex in groups.indices {
             if groups[groupIndex].updateEntry(id: id, mutate: mutate) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    mutating func deleteEntry(id: UUID) -> Bool {
+        if let entryIndex = entries.firstIndex(where: { $0.id == id }) {
+            entries.remove(at: entryIndex)
+            return true
+        }
+
+        for groupIndex in groups.indices {
+            if groups[groupIndex].deleteEntry(id: id) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    mutating func addGroup(_ group: KeePassGroup, toParent parentID: UUID) -> Bool {
+        if id == parentID {
+            groups.append(group)
+            return true
+        }
+
+        for groupIndex in groups.indices {
+            if groups[groupIndex].addGroup(group, toParent: parentID) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    mutating func deleteGroup(id groupID: UUID) -> Bool {
+        if let groupIndex = groups.firstIndex(where: { $0.id == groupID }) {
+            groups.remove(at: groupIndex)
+            return true
+        }
+
+        for groupIndex in groups.indices {
+            if groups[groupIndex].deleteGroup(id: groupID) {
                 return true
             }
         }
