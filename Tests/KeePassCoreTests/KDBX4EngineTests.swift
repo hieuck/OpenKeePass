@@ -351,6 +351,64 @@ final class KDBX4EngineTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.username, "root")
         XCTAssertEqual(vault.root.entries.first?.password, "toor")
     }
+
+    func testSaveCreatesKDBX4FileThatCanBeOpenedAgain() async throws {
+        let engine = KDBX4Engine()
+        let credentials = KDBXCredentials(password: "pw")
+        let entryID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
+        let groupID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+        let vault = KeePassVault(
+            id: groupID,
+            name: "Round Trip",
+            root: KeePassGroup(
+                id: groupID,
+                title: "Root",
+                groups: [
+                    KeePassGroup(
+                        id: UUID(uuidString: "12345678-1234-1234-1234-123456789ABC")!,
+                        title: "Nested",
+                        groups: [],
+                        entries: []
+                    )
+                ],
+                entries: [
+                    KeePassEntry(
+                        id: entryID,
+                        title: "GitHub & GitLab",
+                        username: "octo",
+                        password: "secret<>&\"'",
+                        url: "https://example.com",
+                        notes: "line one\nline two",
+                        customFields: [
+                            KeePassField(name: "TOTP", value: "otpauth://totp/example", isProtected: true),
+                            KeePassField(name: "Environment", value: "prod", isProtected: false)
+                        ]
+                    )
+                ]
+            )
+        )
+
+        let data = try await engine.save(vault: vault, credentials: credentials)
+        let header = try KDBXHeader.parse(data)
+        let reopened = try await engine.open(data: data, credentials: credentials)
+
+        XCTAssertEqual(header.majorVersion, 4)
+        XCTAssertEqual(reopened.name, "Round Trip")
+        XCTAssertEqual(reopened.root.title, "Root")
+        XCTAssertEqual(reopened.root.groups.first?.title, "Nested")
+        XCTAssertEqual(reopened.root.entries.first?.title, "GitHub & GitLab")
+        XCTAssertEqual(reopened.root.entries.first?.username, "octo")
+        XCTAssertEqual(reopened.root.entries.first?.password, "secret<>&\"'")
+        XCTAssertEqual(reopened.root.entries.first?.url, "https://example.com")
+        XCTAssertEqual(reopened.root.entries.first?.notes, "line one\nline two")
+        XCTAssertEqual(
+            reopened.root.entries.first?.customFields,
+            [
+                KeePassField(name: "Environment", value: "prod", isProtected: false),
+                KeePassField(name: "TOTP", value: "otpauth://totp/example", isProtected: true)
+            ]
+        )
+    }
 }
 
 private extension Data {
