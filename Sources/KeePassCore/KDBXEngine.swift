@@ -17,6 +17,8 @@ public protocol KDBXEngine: Sendable {
 }
 
 public enum KDBXError: Error, Equatable, Sendable {
+    case notKeePassDatabase
+    case truncatedHeader
     case wrongCredentials
     case unsupportedFeature(String)
     case corruptDatabase
