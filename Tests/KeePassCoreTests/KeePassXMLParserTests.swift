@@ -143,6 +143,32 @@ final class KeePassXMLParserTests: XCTestCase {
         ])
     }
 
+    func testParsesSelfClosingBinaryPoolAttachmentReferences() throws {
+        let xml = """
+        <KeePassFile>
+          <Meta>
+            <Binaries>
+              <Binary ID="0">c2VsZi1jbG9zaW5nLXJlZg==</Binary>
+            </Binaries>
+          </Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <Binary><Key>self-closing.txt</Key><Value Ref="0"/></Binary>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """
+
+        let vault = try KeePassXMLParser.parse(Data(xml.utf8))
+
+        XCTAssertEqual(vault.root.entries.first?.attachments, [
+            KeePassAttachment(name: "self-closing.txt", data: Data("self-closing-ref".utf8), isProtected: false)
+        ])
+    }
+
     func testParsesCompressedBinaryPoolAttachmentReferences() throws {
         let xml = """
         <KeePassFile>

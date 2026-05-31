@@ -79,7 +79,7 @@ public enum KeePassXMLParser {
 
     private static func parseAttachment(_ xml: String, binaryPool: [String: Data]) throws -> KeePassAttachment? {
         guard let key = firstText(in: xml, tag: "Key"),
-              let valueElement = firstElement(in: xml, tag: "Value") else {
+              let valueElement = firstElement(in: xml, tag: "Value") ?? firstSelfClosingElement(in: xml, tag: "Value") else {
             return nil
         }
         let valueTag = openingTag(of: valueElement)
@@ -186,6 +186,16 @@ public enum KeePassXMLParser {
         }
 
         return nil
+    }
+
+    private static func firstSelfClosingElement(in xml: String, tag: String) -> String? {
+        let openPrefix = "<\(tag)"
+        guard let openStart = xml.range(of: openPrefix),
+              let openEnd = xml[openStart.upperBound...].firstIndex(of: ">") else {
+            return nil
+        }
+        let element = String(xml[openStart.lowerBound...openEnd])
+        return element.hasSuffix("/>") ? element : nil
     }
 
     private static func directElements(in xml: String, tag: String) -> [String] {
