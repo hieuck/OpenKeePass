@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
-	<string>OpenKeePass uses Face ID to unlock your local vault after you enable biometric protection.</string>
+	<string>OpenKeePass uses device authentication to unlock your local vault after you enable app protection.</string>
 	<key>UISupportsDocumentBrowser</key>
 	<false/>
 	<key>CFBundleDocumentTypes</key>
