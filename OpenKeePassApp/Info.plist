@@ -24,6 +24,8 @@
 	<true/>
 	<key>NSFaceIDUsageDescription</key>
 	<string>OpenKeePass uses device authentication to unlock your local vault after you enable app protection.</string>
+	<key>OpenKeePassKeychainAccessGroup</key>
+	<string>$(AppIdentifierPrefix)dev.openkeepass.shared</string>
 	<key>UISupportsDocumentBrowser</key>
 	<false/>
 	<key>CFBundleDocumentTypes</key>

@@ -22,6 +22,27 @@ final class AutoFillCredentialCacheTests: XCTestCase {
         XCTAssertEqual(records[0].serviceHost, "example.com")
     }
 
+    func testProtectedWriteDoesNotPersistPlaintextPassword() throws {
+        let directory = try temporaryDirectory()
+        let protection = ReversingCredentialCacheProtection()
+        let cache = AutoFillCredentialCache(directory: directory, protection: protection)
+        let records = [
+            AutoFillCredentialRecord(
+                id: "1",
+                title: "Example",
+                username: "user@example.com",
+                password: "plain-secret-password",
+                url: "https://example.com/login"
+            )
+        ]
+
+        try cache.write(records)
+
+        let rawData = try Data(contentsOf: directory.appendingPathComponent(AutoFillCredentialCache.fileName))
+        XCTAssertFalse(String(data: rawData, encoding: .utf8)?.contains("plain-secret-password") ?? false)
+        XCTAssertEqual(try cache.read(), records)
+    }
+
     func testFiltersCredentialsByDomainServiceIdentifier() throws {
         let directory = try temporaryDirectory()
         let cache = AutoFillCredentialCache(directory: directory)
@@ -68,5 +89,15 @@ final class AutoFillCredentialCacheTests: XCTestCase {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+}
+
+private struct ReversingCredentialCacheProtection: AutoFillCredentialCacheProtection {
+    func protect(_ data: Data) throws -> Data {
+        Data(data.reversed())
+    }
+
+    func unprotect(_ data: Data) throws -> Data {
+        Data(data.reversed())
     }
 }
