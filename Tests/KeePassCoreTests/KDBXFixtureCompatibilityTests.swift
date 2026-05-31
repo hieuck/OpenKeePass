@@ -50,6 +50,31 @@ final class KDBXFixtureCompatibilityTests: XCTestCase {
         #endif
     }
 
+    func testOpensKeePassXCGeneratedAttachmentFixture() async throws {
+        #if os(Windows)
+        throw XCTSkip("KeePassXC fixture uses high AES-KDF rounds and needs the Apple CommonCrypto fast path.")
+        #else
+        let vault = try await openFixture(
+            name: "keepassxc-attachment",
+            credentials: KDBXCredentials(password: "openkeepass")
+        )
+
+        let entry = try XCTUnwrap(vault.root.entries.first)
+        XCTAssertEqual(entry.title, "AttachmentEntry")
+        XCTAssertEqual(entry.username, "keepassxc-attachment-user")
+        XCTAssertEqual(entry.password, "keepassxc-attachment-secret")
+        XCTAssertEqual(entry.url, "https://attachments.keepassxc.example.com")
+        XCTAssertEqual(entry.notes, "entry with attachment from KeePassXC CLI")
+        XCTAssertEqual(entry.attachments, [
+            KeePassAttachment(
+                name: "keepassxc-attachment.txt",
+                data: Data("attachment from KeePassXC CLI".utf8),
+                isProtected: false
+            )
+        ])
+        #endif
+    }
+
     func testEditsKDBX3FixtureAndReopensSavedData() async throws {
         let engine = KDBX4Engine()
         let credentials = KDBXCredentials(password: "openkeepass")
