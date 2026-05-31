@@ -71,10 +71,7 @@ private struct CustomFieldsSection: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(field.name)
-                        Text(field.displayValue)
-                            .font(field.isProtected ? .body.monospaced() : .body)
-                            .foregroundColor(.secondary)
-                            .textSelection(field.isProtected ? .disabled : .enabled)
+                        CustomFieldValueText(field: field)
                     }
                     Spacer()
                     Button {
@@ -85,6 +82,22 @@ private struct CustomFieldsSection: View {
                     .accessibilityLabel("Copy \(field.name)")
                 }
             }
+        }
+    }
+}
+
+private struct CustomFieldValueText: View {
+    let field: KeePassField
+
+    var body: some View {
+        if field.isProtected {
+            Text(field.displayValue)
+                .font(.body.monospaced())
+                .foregroundColor(.secondary)
+        } else {
+            Text(field.displayValue)
+                .foregroundColor(.secondary)
+                .textSelection(.enabled)
         }
     }
 }
