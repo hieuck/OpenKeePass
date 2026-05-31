@@ -87,6 +87,61 @@ final class KDBX4EngineTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.password, "secret")
     }
 
+    func testOpenWithKDBX4HMACProtectedBlockStreamReturnsParsedVault() async throws {
+        let engine = KDBX4Engine()
+        let credentials = KDBXCredentials(password: "pw")
+        let masterSeed = Data(repeating: 0xA5, count: 32)
+        let transformSeed = Data(repeating: 0x01, count: 32)
+        let iv = Data(repeating: 0x02, count: 16)
+        let composite = try KDBXCompositeKey.material(from: credentials)
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: .aes(seed: transformSeed, rounds: 1))
+        let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
+        let plaintext = Data("""
+        <KeePassFile>
+          <Meta><DatabaseName>Framed</DatabaseName></Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>Mail</Value></String>
+                <String><Key>UserName</Key><Value>user@example.com</Value></String>
+                <String><Key>Password</Key><Value>pass</Value></String>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """.utf8)
+        let paddingLength = 16 - (plaintext.count % 16)
+        let ciphertext = try AES256(key: finalKey).encryptCBC(
+            plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
+            iv: iv
+        )
+
+        var framedPayload = Data()
+        framedPayload.appendKDBX4Block(index: 0, payload: ciphertext) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+        framedPayload.appendKDBX4Block(index: 1, payload: Data()) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+
+        var data = Data.kdbx4AESHeader(masterSeed: masterSeed, transformSeed: transformSeed, iv: iv)
+        let header = data
+        data.append(SHA256.hash(header))
+        data.append(HMACSHA256.authenticate(
+            message: header,
+            key: KDBX4HMACKeyDerivation.headerKey(masterSeed: masterSeed, transformedKey: transformed)
+        ))
+        data.append(framedPayload)
+
+        let vault = try await engine.open(data: data, credentials: credentials)
+
+        XCTAssertEqual(vault.name, "Framed")
+        XCTAssertEqual(vault.root.entries.first?.title, "Mail")
+        XCTAssertEqual(vault.root.entries.first?.username, "user@example.com")
+        XCTAssertEqual(vault.root.entries.first?.password, "pass")
+    }
+
     func testOpenWithArgon2HeaderReportsKDFUnsupported() async {
         let engine = KDBX4Engine()
         let data = Data.kdbx4Argon2Header()
@@ -209,6 +264,17 @@ private extension Data {
         append(UInt8((value & 0x0000FF0000000000) >> 40))
         append(UInt8((value & 0x00FF000000000000) >> 48))
         append(UInt8((value & 0xFF00000000000000) >> 56))
+    }
+
+    mutating func appendKDBX4Block(index: UInt64, payload: Data, keyProvider: (UInt64) -> Data) {
+        var message = Data()
+        message.appendUInt64LE(index)
+        message.appendUInt32LE(UInt32(payload.count))
+        message.append(payload)
+
+        append(HMACSHA256.authenticate(message: message, key: keyProvider(index)))
+        appendUInt32LE(UInt32(payload.count))
+        append(payload)
     }
 }
 
