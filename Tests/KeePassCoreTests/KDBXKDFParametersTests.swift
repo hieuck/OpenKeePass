@@ -23,7 +23,7 @@ final class KDBXKDFParametersTests: XCTestCase {
             "V": .uint32(0x13),
             "S": .bytes(salt),
             "I": .uint64(4),
-            "M": .uint64(64 * 1024 * 1024),
+            "M": .uint64(UInt64(64 * 1024 * 1024)),
             "P": .uint32(2)
         ])
 
@@ -31,12 +31,12 @@ final class KDBXKDFParametersTests: XCTestCase {
 
         XCTAssertEqual(
             parameters,
-            .argon2(
+            KDBXKDFParameters.argon2(
                 variant: .argon2d,
                 version: 0x13,
                 salt: salt,
                 iterations: 4,
-                memory: 64 * 1024 * 1024,
+                memory: UInt64(64 * 1024 * 1024),
                 parallelism: 2
             )
         )
@@ -49,7 +49,7 @@ final class KDBXKDFParametersTests: XCTestCase {
             "V": .uint32(0x13),
             "S": .bytes(salt),
             "I": .uint64(3),
-            "M": .uint64(32 * 1024 * 1024),
+            "M": .uint64(UInt64(32 * 1024 * 1024)),
             "P": .uint32(1)
         ])
 
@@ -57,12 +57,12 @@ final class KDBXKDFParametersTests: XCTestCase {
 
         XCTAssertEqual(
             parameters,
-            .argon2(
+            KDBXKDFParameters.argon2(
                 variant: .argon2id,
                 version: 0x13,
                 salt: salt,
                 iterations: 3,
-                memory: 32 * 1024 * 1024,
+                memory: UInt64(32 * 1024 * 1024),
                 parallelism: 1
             )
         )

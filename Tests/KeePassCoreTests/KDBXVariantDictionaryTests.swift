@@ -9,7 +9,7 @@ final class KDBXVariantDictionaryTests: XCTestCase {
         let data = Data.variantDictionary([
             .bytes("$UUID", uuid),
             .uint64("I", 12),
-            .uint64("M", 64 * 1024 * 1024),
+            .uint64("M", UInt64(64 * 1024 * 1024)),
             .uint32("P", 2),
             .bytes("S", seed),
             .bool("B", true),
@@ -18,13 +18,13 @@ final class KDBXVariantDictionaryTests: XCTestCase {
 
         let dictionary = try KDBXVariantDictionary.parse(data)
 
-        XCTAssertEqual(dictionary["$UUID"], .bytes(uuid))
-        XCTAssertEqual(dictionary["I"], .uint64(12))
-        XCTAssertEqual(dictionary["M"], .uint64(64 * 1024 * 1024))
-        XCTAssertEqual(dictionary["P"], .uint32(2))
-        XCTAssertEqual(dictionary["S"], .bytes(seed))
-        XCTAssertEqual(dictionary["B"], .bool(true))
-        XCTAssertEqual(dictionary["Name"], .string("Argon2id"))
+        XCTAssertEqual(dictionary["$UUID"], KDBXVariantValue.bytes(uuid))
+        XCTAssertEqual(dictionary["I"], KDBXVariantValue.uint64(12))
+        XCTAssertEqual(dictionary["M"], KDBXVariantValue.uint64(UInt64(64 * 1024 * 1024)))
+        XCTAssertEqual(dictionary["P"], KDBXVariantValue.uint32(2))
+        XCTAssertEqual(dictionary["S"], KDBXVariantValue.bytes(seed))
+        XCTAssertEqual(dictionary["B"], KDBXVariantValue.bool(true))
+        XCTAssertEqual(dictionary["Name"], KDBXVariantValue.string("Argon2id"))
     }
 
     func testRejectsInvalidVersion() {
