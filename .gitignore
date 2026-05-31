@@ -1,0 +1,7 @@
+.worktrees/
+.build/
+DerivedData/
+*.xcuserdata/
+*.xcuserstate
+*.ipa
+*.xcarchive
