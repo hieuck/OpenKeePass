@@ -24,13 +24,13 @@ public struct KDBX4Engine: KDBXEngine {
            let cipherID = header.cipherID,
            let encryptionIV = header.encryptionIV,
            let finalKey {
-            _ = try KDBXPayloadDecryptor.decrypt(
+            let decryptedPayload = try KDBXPayloadDecryptor.decrypt(
                 ciphertext: Data(encryptedPayload),
                 cipherID: cipherID,
                 finalKey: finalKey,
                 encryptionIV: encryptionIV
             )
-            throw KDBXError.unsupportedFeature("KDBX XML parsing is not implemented yet")
+            return try KeePassXMLParser.parse(decryptedPayload)
         }
 
         throw KDBXError.unsupportedFeature("KDBX 4 payload decryption is not implemented yet")

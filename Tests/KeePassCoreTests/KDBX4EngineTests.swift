@@ -48,7 +48,7 @@ final class KDBX4EngineTests: XCTestCase {
         }
     }
 
-    func testOpenWithAESKDFHeaderAndPayloadDecryptsBeforeXMLParsing() async throws {
+    func testOpenWithAESKDFHeaderAndPayloadReturnsParsedVault() async throws {
         let engine = KDBX4Engine()
         let credentials = KDBXCredentials(password: "pw")
         let masterSeed = Data(repeating: 0xA5, count: 32)
@@ -57,7 +57,21 @@ final class KDBX4EngineTests: XCTestCase {
         let composite = try KDBXCompositeKey.material(from: credentials)
         let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: .aes(seed: transformSeed, rounds: 1))
         let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
-        let plaintext = Data("<KeePassFile/>".utf8)
+        let plaintext = Data("""
+        <KeePassFile>
+          <Meta><DatabaseName>Fixture</DatabaseName></Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>GitHub</Value></String>
+                <String><Key>UserName</Key><Value>octo</Value></String>
+                <String><Key>Password</Key><Value>secret</Value></String>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """.utf8)
         let paddingLength = 16 - (plaintext.count % 16)
         let ciphertext = try AES256(key: finalKey).encryptCBC(
             plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
@@ -65,12 +79,12 @@ final class KDBX4EngineTests: XCTestCase {
         )
         let data = Data.kdbx4AESHeader(masterSeed: masterSeed, transformSeed: transformSeed, iv: iv, payload: ciphertext)
 
-        do {
-            _ = try await engine.open(data: data, credentials: credentials)
-            XCTFail("Expected XML parsing to remain unsupported")
-        } catch {
-            XCTAssertEqual(error as? KDBXError, .unsupportedFeature("KDBX XML parsing is not implemented yet"))
-        }
+        let vault = try await engine.open(data: data, credentials: credentials)
+
+        XCTAssertEqual(vault.name, "Fixture")
+        XCTAssertEqual(vault.root.entries.first?.title, "GitHub")
+        XCTAssertEqual(vault.root.entries.first?.username, "octo")
+        XCTAssertEqual(vault.root.entries.first?.password, "secret")
     }
 
     func testOpenWithArgon2HeaderReportsKDFUnsupported() async {
