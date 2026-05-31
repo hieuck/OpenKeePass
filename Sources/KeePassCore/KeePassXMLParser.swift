@@ -18,21 +18,22 @@ public enum KeePassXMLParser {
             throw KDBXError.corruptDatabase
         }
 
-        let rootGroup = try parseGroup(rootGroupXML)
+        let binaryPool = try parseBinaryPool(in: xml)
+        let rootGroup = try parseGroup(rootGroupXML, binaryPool: binaryPool)
         return KeePassVault(id: rootGroup.id, name: databaseName, root: rootGroup)
     }
 
-    private static func parseGroup(_ xml: String) throws -> KeePassGroup {
+    private static func parseGroup(_ xml: String, binaryPool: [String: Data]) throws -> KeePassGroup {
         let id = uuid(from: firstText(in: xml, tag: "UUID")) ?? UUID()
         let title = firstDirectText(in: xml, tag: "Name") ?? "Group"
         let childEntryXMLs = directElements(in: xml, tag: "Entry")
         let childGroupXMLs = directElements(in: xml, tag: "Group")
-        let entries = try childEntryXMLs.map { try parseEntry($0, includeHistory: true) }
-        let groups = try childGroupXMLs.map(parseGroup)
+        let entries = try childEntryXMLs.map { try parseEntry($0, includeHistory: true, binaryPool: binaryPool) }
+        let groups = try childGroupXMLs.map { try parseGroup($0, binaryPool: binaryPool) }
         return KeePassGroup(id: id, title: title, groups: groups, entries: entries)
     }
 
-    private static func parseEntry(_ xml: String, includeHistory: Bool) throws -> KeePassEntry {
+    private static func parseEntry(_ xml: String, includeHistory: Bool, binaryPool: [String: Data]) throws -> KeePassEntry {
         let id = uuid(from: firstDirectText(in: xml, tag: "UUID")) ?? UUID()
         let entryFieldsXML = removingDirectElements(tag: "History", from: xml)
         var fields: [String: KeePassField] = [:]
@@ -53,8 +54,8 @@ public enum KeePassXMLParser {
             .filter { !standardKeys.contains($0.key) }
             .sorted { $0.key < $1.key }
             .map(\.value)
-        let attachments = try directElements(in: entryFieldsXML, tag: "Binary").compactMap(parseAttachment)
-        let history = includeHistory ? try parseHistory(in: xml) : []
+        let attachments = try directElements(in: entryFieldsXML, tag: "Binary").compactMap { try parseAttachment($0, binaryPool: binaryPool) }
+        let history = includeHistory ? try parseHistory(in: xml, binaryPool: binaryPool) : []
 
         return KeePassEntry(
             id: id,
@@ -69,21 +70,24 @@ public enum KeePassXMLParser {
         )
     }
 
-    private static func parseHistory(in xml: String) throws -> [KeePassEntry] {
+    private static func parseHistory(in xml: String, binaryPool: [String: Data]) throws -> [KeePassEntry] {
         guard let historyXML = firstDirectElement(in: xml, tag: "History") else {
             return []
         }
-        return try directElements(in: historyXML, tag: "Entry").map { try parseEntry($0, includeHistory: false) }
+        return try directElements(in: historyXML, tag: "Entry").map { try parseEntry($0, includeHistory: false, binaryPool: binaryPool) }
     }
 
-    private static func parseAttachment(_ xml: String) throws -> KeePassAttachment? {
+    private static func parseAttachment(_ xml: String, binaryPool: [String: Data]) throws -> KeePassAttachment? {
         guard let key = firstText(in: xml, tag: "Key"),
               let valueElement = firstElement(in: xml, tag: "Value") else {
             return nil
         }
         let valueTag = openingTag(of: valueElement)
-        if valueTag.localizedCaseInsensitiveContains("Ref=") {
-            return nil
+        if let referenceID = attributeValue(named: "Ref", in: valueTag) {
+            guard let data = binaryPool[referenceID] else {
+                throw KDBXError.corruptDatabase
+            }
+            return KeePassAttachment(name: key, data: data, isProtected: false)
         }
         let encoded = innerText(of: valueElement)
         guard let data = Data(base64Encoded: encoded) else {
@@ -92,6 +96,31 @@ public enum KeePassXMLParser {
         let isProtected = valueTag.localizedCaseInsensitiveContains("Protected=\"True\"")
             || valueTag.localizedCaseInsensitiveContains("Protected=\"true\"")
         return KeePassAttachment(name: key, data: data, isProtected: isProtected)
+    }
+
+    private static func parseBinaryPool(in xml: String) throws -> [String: Data] {
+        guard let metaXML = firstElement(in: xml, tag: "Meta"),
+              let binariesXML = firstElement(in: metaXML, tag: "Binaries") else {
+            return [:]
+        }
+
+        var pool: [String: Data] = [:]
+        for binaryXML in directElements(in: binariesXML, tag: "Binary") {
+            let tag = openingTag(of: binaryXML)
+            guard let id = attributeValue(named: "ID", in: tag) else {
+                continue
+            }
+            let encoded = innerText(of: binaryXML)
+            guard let encodedData = Data(base64Encoded: encoded) else {
+                throw KDBXError.corruptDatabase
+            }
+            if attributeValue(named: "Compressed", in: tag)?.caseInsensitiveCompare("True") == .orderedSame {
+                pool[id] = try KDBXPayloadCompression.decode(encodedData, compression: .gzip)
+            } else {
+                pool[id] = encodedData
+            }
+        }
+        return pool
     }
 
     private static func uuid(from base64: String?) -> UUID? {
@@ -230,6 +259,21 @@ public enum KeePassXMLParser {
             return element
         }
         return String(element[...end])
+    }
+
+    private static func attributeValue(named name: String, in tag: String) -> String? {
+        for quote in ["\"", "'"] {
+            let prefix = "\(name)=\(quote)"
+            guard let start = tag.range(of: prefix, options: .caseInsensitive) else {
+                continue
+            }
+            let valueStart = start.upperBound
+            guard let end = tag[valueStart...].firstIndex(of: Character(quote)) else {
+                return nil
+            }
+            return String(tag[valueStart..<end])
+        }
+        return nil
     }
 
     private static func decodeXML(_ value: String) -> String {

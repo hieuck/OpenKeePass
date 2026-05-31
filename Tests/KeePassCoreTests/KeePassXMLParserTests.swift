@@ -116,6 +116,59 @@ final class KeePassXMLParserTests: XCTestCase {
         ])
     }
 
+    func testParsesBinaryPoolAttachmentReferences() throws {
+        let xml = """
+        <KeePassFile>
+          <Meta>
+            <Binaries>
+              <Binary ID="0">cmVmZXJlbmNlZC1kYXRh</Binary>
+            </Binaries>
+          </Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>Document</Value></String>
+                <Binary><Key>referenced.txt</Key><Value Ref="0"></Value></Binary>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """
+
+        let vault = try KeePassXMLParser.parse(Data(xml.utf8))
+
+        XCTAssertEqual(vault.root.entries.first?.attachments, [
+            KeePassAttachment(name: "referenced.txt", data: Data("referenced-data".utf8), isProtected: false)
+        ])
+    }
+
+    func testParsesCompressedBinaryPoolAttachmentReferences() throws {
+        let xml = """
+        <KeePassFile>
+          <Meta>
+            <Binaries>
+              <Binary ID="0" Compressed="True">H4sIAAAAAAAACkvOzy0oSi0uTk3RTUksSQQA14gwtg8AAAA=</Binary>
+            </Binaries>
+          </Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <Binary><Key>compressed.txt</Key><Value Ref="0"></Value></Binary>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """
+
+        let vault = try KeePassXMLParser.parse(Data(xml.utf8))
+
+        XCTAssertEqual(vault.root.entries.first?.attachments, [
+            KeePassAttachment(name: "compressed.txt", data: Data("compressed-data".utf8), isProtected: false)
+        ])
+    }
+
     func testParsesEntryHistory() throws {
         let xml = """
         <KeePassFile>
