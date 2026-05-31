@@ -96,7 +96,7 @@ final class KDBX4EngineTests: XCTestCase {
         let composite = try KDBXCompositeKey.material(from: credentials)
         let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: .aes(seed: transformSeed, rounds: 1))
         let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
-        let plaintext = Data("""
+        let xml = Data("""
         <KeePassFile>
           <Meta><DatabaseName>Framed</DatabaseName></Meta>
           <Root>
@@ -111,6 +111,11 @@ final class KDBX4EngineTests: XCTestCase {
           </Root>
         </KeePassFile>
         """.utf8)
+        var plaintext = Data()
+        plaintext.appendInnerHeaderField(id: 1, payload: Data([0x02]))
+        plaintext.appendInnerHeaderField(id: 2, payload: Data(repeating: 0xA5, count: 32))
+        plaintext.appendInnerHeaderField(id: 0, payload: Data())
+        plaintext.append(xml)
         let paddingLength = 16 - (plaintext.count % 16)
         let ciphertext = try AES256(key: finalKey).encryptCBC(
             plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
@@ -301,6 +306,12 @@ private extension Data {
     }
 
     mutating func appendField(id: UInt8, payload: Data) {
+        append(id)
+        appendUInt32LE(UInt32(payload.count))
+        append(payload)
+    }
+
+    mutating func appendInnerHeaderField(id: UInt8, payload: Data) {
         append(id)
         appendUInt32LE(UInt32(payload.count))
         append(payload)

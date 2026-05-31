@@ -38,7 +38,7 @@ public struct KDBX4Engine: KDBXEngine {
                 finalKey: finalKey,
                 encryptionIV: encryptionIV
             )
-            return try KeePassXMLParser.parse(decryptedPayload)
+            return try KeePassXMLParser.parse(try KDBX4InnerHeader.strip(from: decryptedPayload))
         }
 
         throw KDBXError.unsupportedFeature("KDBX 4 payload decryption is not implemented yet")
