@@ -67,6 +67,7 @@ More representative KeePass/KeePassXC desktop-generated databases still need to 
 The app can select a `.kdbx` file from Files, remember the recent vault with a security-scoped bookmark, unlock it with a master password and optional key file, browse the real unlocked group tree, search entries, view entry details, add or edit entries, and save edited KDBX 4 vault data back through security-scoped file access.
 
 Entry details show copyable time-based one-time password codes when the entry contains a supported TOTP custom field.
+Entry details also list attachments and can hand an attachment file to the native iOS share sheet.
 
 When a vault is unlocked or edited, OpenKeePass exports eligible URL credentials into the app group container and refreshes iOS AutoFill credential identities. The shared AutoFill cache is protected with AES-GCM using a symmetric key stored in a shared Keychain access group, and the extension can list matching credentials and return the selected username/password pair. This still needs device testing with a signed build before a security-sensitive release claim.
 

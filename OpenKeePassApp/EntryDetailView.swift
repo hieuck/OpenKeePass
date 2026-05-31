@@ -39,6 +39,10 @@ struct EntryDetailView: View {
                     OneTimePasswordSection(configuration: otpConfiguration)
                 }
 
+                if !entry.attachments.isEmpty {
+                    AttachmentSection(attachments: entry.attachments)
+                }
+
                 Section {
                     NavigationLink("Edit", destination: EntryEditorView(entry: entry) { updatedEntry in
                         model.updateEntry(updatedEntry)
@@ -52,6 +56,80 @@ struct EntryDetailView: View {
                 .navigationTitle("Entry")
         }
     }
+}
+
+private struct AttachmentSection: View {
+    let attachments: [KeePassAttachment]
+    @State private var shareItem: AttachmentShareItem?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        Section("Attachments") {
+            ForEach(Array(attachments.enumerated()), id: \.offset) { _, attachment in
+                HStack {
+                    Image(systemName: "paperclip")
+                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(attachment.safeExportFileName)
+                        HStack(spacing: 6) {
+                            Text(attachment.byteCountDescription)
+                            if attachment.isProtected {
+                                Text("Protected")
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button {
+                        share(attachment)
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                    .accessibilityLabel("Share \(attachment.safeExportFileName)")
+                }
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+        .sheet(item: $shareItem) { item in
+            ActivityView(activityItems: [item.url])
+        }
+    }
+
+    private func share(_ attachment: KeePassAttachment) {
+        do {
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("OpenKeePassAttachments", isDirectory: true)
+                .appendingPathComponent(UUID().uuidString, isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let url = directory.appendingPathComponent(attachment.safeExportFileName)
+            try attachment.data.write(to: url, options: .atomic)
+            errorMessage = nil
+            shareItem = AttachmentShareItem(url: url)
+        } catch {
+            errorMessage = "Could not prepare attachment for sharing."
+        }
+    }
+}
+
+private struct AttachmentShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 private struct OneTimePasswordSection: View {

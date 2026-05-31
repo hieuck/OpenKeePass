@@ -70,6 +70,25 @@ final class VaultModelsTests: XCTestCase {
         XCTAssertEqual(updated.history, entry.history)
     }
 
+    func testAttachmentDisplayMetadata() {
+        XCTAssertEqual(
+            KeePassAttachment(name: "recovery.txt", data: Data(repeating: 0, count: 512), isProtected: false).byteCountDescription,
+            "512 bytes"
+        )
+        XCTAssertEqual(
+            KeePassAttachment(name: "photo.jpg", data: Data(repeating: 0, count: 1_536), isProtected: false).byteCountDescription,
+            "1.5 KB"
+        )
+        XCTAssertEqual(
+            KeePassAttachment(name: "../secrets/recovery.txt", data: Data(), isProtected: false).safeExportFileName,
+            "recovery.txt"
+        )
+        XCTAssertEqual(
+            KeePassAttachment(name: "", data: Data(), isProtected: false).safeExportFileName,
+            "attachment"
+        )
+    }
+
     func testSearchMatchesNestedEntriesByCommonFields() {
         let matchingByURL = KeePassEntry.fixture(title: "Source", url: "https://github.com/openkeepass")
         let matchingByCustomField = KeePassEntry.fixture(title: "Server", customFields: [.init(name: "host", value: "vault.internal", isProtected: false)])
