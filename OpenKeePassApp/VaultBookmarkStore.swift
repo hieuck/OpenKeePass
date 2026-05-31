@@ -10,7 +10,7 @@ struct VaultBookmarkStore {
 
     func save(_ url: URL) throws {
         let bookmark = try url.bookmarkData(
-            options: [.withSecurityScope],
+            options: [],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
@@ -25,7 +25,7 @@ struct VaultBookmarkStore {
         var isStale = false
         guard let url = try? URL(
             resolvingBookmarkData: bookmark,
-            options: [.withSecurityScope],
+            options: [],
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ), !isStale else {
