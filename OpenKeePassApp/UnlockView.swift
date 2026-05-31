@@ -6,7 +6,7 @@ struct UnlockView: View {
     let vault: VaultReference
     @State private var password = ""
     @State private var errorMessage: String?
-    @StateObject private var model = UnlockModel()
+    @StateObject private var model = VaultSessionModel()
 
     var body: some View {
         Form {
@@ -39,7 +39,10 @@ struct UnlockView: View {
 
             if let unlockedVault = model.vault {
                 Section {
-                    NavigationLink("Open Vault", destination: GroupListView(vault: unlockedVault))
+                    NavigationLink(
+                        "Open Vault",
+                        destination: GroupListView(model: model, groupID: unlockedVault.root.id)
+                    )
                 }
             }
         }
@@ -65,33 +68,7 @@ struct UnlockView: View {
     }
 }
 
-@MainActor
-private final class UnlockModel: ObservableObject {
-    @Published var isUnlocking = false
-    @Published var vault: KeePassVault?
-    @Published var errorMessage: String?
-
-    private let store = VaultStore(engine: KDBX4Engine())
-
-    func unlock(data: Data, password: String) async throws {
-        isUnlocking = true
-        vault = nil
-        errorMessage = nil
-        defer {
-            isUnlocking = false
-        }
-
-        do {
-            try await store.unlock(data: data, credentials: KDBXCredentials(password: password))
-            vault = store.unlockedVault
-        } catch {
-            errorMessage = UnlockErrorMessage.describe(error)
-            throw error
-        }
-    }
-}
-
-private enum UnlockErrorMessage {
+enum UnlockErrorMessage {
     static func describe(_ error: Error) -> String {
         guard let kdbxError = error as? KDBXError else {
             return "Could not unlock this vault."

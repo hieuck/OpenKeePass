@@ -3,15 +3,19 @@ import PasswordTools
 import SwiftUI
 
 struct EntryEditorView: View {
+    @Environment(\.dismiss) private var dismiss
+
     let entry: KeePassEntry?
+    let onSave: (KeePassEntry) -> Void
     @State private var title: String
     @State private var username: String
     @State private var password: String
     @State private var url: String
     @State private var notes: String
 
-    init(entry: KeePassEntry?) {
+    init(entry: KeePassEntry?, onSave: @escaping (KeePassEntry) -> Void) {
         self.entry = entry
+        self.onSave = onSave
         _title = State(initialValue: entry?.title ?? "")
         _username = State(initialValue: entry?.username ?? "")
         _password = State(initialValue: entry?.password ?? "")
@@ -45,7 +49,20 @@ struct EntryEditorView: View {
         }
         .navigationTitle(entry == nil ? "New Entry" : "Edit Entry")
         .toolbar {
-            Button("Save") {}
+            Button("Save") {
+                onSave(
+                    KeePassEntry(
+                        id: entry?.id ?? UUID(),
+                        title: title,
+                        username: username,
+                        password: password,
+                        url: url,
+                        notes: notes,
+                        customFields: entry?.customFields ?? []
+                    )
+                )
+                dismiss()
+            }
                 .disabled(title.isEmpty)
         }
     }

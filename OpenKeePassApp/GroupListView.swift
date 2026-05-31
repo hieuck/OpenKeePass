@@ -2,14 +2,21 @@ import KeePassCore
 import SwiftUI
 
 struct GroupListView: View {
-    let vault: KeePassVault
+    @ObservedObject var model: VaultSessionModel
+    let groupID: UUID
 
     var body: some View {
-        GroupContentView(vaultName: vault.name, group: vault.root)
+        if let vaultName = model.vault?.name, let group = model.group(id: groupID) {
+            GroupContentView(model: model, vaultName: vaultName, group: group)
+        } else {
+            Text("This group is no longer available.")
+                .foregroundColor(.secondary)
+        }
     }
 }
 
 private struct GroupContentView: View {
+    @ObservedObject var model: VaultSessionModel
     let vaultName: String
     let group: KeePassGroup
     @State private var searchText = ""
@@ -28,7 +35,7 @@ private struct GroupContentView: View {
             if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !group.groups.isEmpty {
                 Section("Groups") {
                     ForEach(group.groups) { child in
-                        NavigationLink(destination: GroupContentView(vaultName: vaultName, group: child)) {
+                        NavigationLink(destination: GroupListView(model: model, groupID: child.id)) {
                             Label(child.title, systemImage: "folder")
                         }
                     }
@@ -37,7 +44,7 @@ private struct GroupContentView: View {
 
             Section("Entries") {
                 ForEach(filteredEntries) { entry in
-                    NavigationLink(destination: EntryDetailView(entry: entry)) {
+                    NavigationLink(destination: EntryDetailView(model: model, entryID: entry.id)) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(entry.title)
                                 .font(.headline)
@@ -54,7 +61,9 @@ private struct GroupContentView: View {
         .searchable(text: $searchText)
         .navigationTitle(group.title.isEmpty ? vaultName : group.title)
         .toolbar {
-            NavigationLink(destination: EntryEditorView(entry: nil)) {
+            NavigationLink(destination: EntryEditorView(entry: nil) { entry in
+                model.addEntry(entry, toGroup: group.id)
+            }) {
                 Image(systemName: "plus")
             }
             .accessibilityLabel("Add Entry")

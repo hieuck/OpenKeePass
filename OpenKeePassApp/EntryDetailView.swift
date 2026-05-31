@@ -3,40 +3,49 @@ import SwiftUI
 import UIKit
 
 struct EntryDetailView: View {
-    let entry: KeePassEntry
+    @ObservedObject var model: VaultSessionModel
+    let entryID: UUID
 
     var body: some View {
-        Form {
-            Section("Account") {
-                DetailRow(label: "Title", value: entry.title)
-                DetailRow(label: "Username", value: entry.username)
-                DetailRow(label: "URL", value: entry.url)
-            }
+        if let entry = model.entry(id: entryID) {
+            Form {
+                Section("Account") {
+                    DetailRow(label: "Title", value: entry.title)
+                    DetailRow(label: "Username", value: entry.username)
+                    DetailRow(label: "URL", value: entry.url)
+                }
 
-            Section("Password") {
-                HStack {
-                    Text("••••••••")
-                    Spacer()
-                    Button {
-                        UIPasteboard.general.string = entry.password
-                    } label: {
-                        Image(systemName: "doc.on.doc")
+                Section("Password") {
+                    HStack {
+                        Text("••••••••")
+                        Spacer()
+                        Button {
+                            UIPasteboard.general.string = entry.password
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                        }
+                        .accessibilityLabel("Copy Password")
                     }
-                    .accessibilityLabel("Copy Password")
+                }
+
+                if !entry.notes.isEmpty {
+                    Section("Notes") {
+                        Text(entry.notes)
+                    }
+                }
+
+                Section {
+                    NavigationLink("Edit", destination: EntryEditorView(entry: entry) { updatedEntry in
+                        model.updateEntry(updatedEntry)
+                    })
                 }
             }
-
-            if !entry.notes.isEmpty {
-                Section("Notes") {
-                    Text(entry.notes)
-                }
-            }
-
-            Section {
-                NavigationLink("Edit", destination: EntryEditorView(entry: entry))
-            }
+            .navigationTitle(entry.title)
+        } else {
+            Text("This entry is no longer available.")
+                .foregroundColor(.secondary)
+                .navigationTitle("Entry")
         }
-        .navigationTitle(entry.title)
     }
 }
 
