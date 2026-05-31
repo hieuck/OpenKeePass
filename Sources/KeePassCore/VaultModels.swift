@@ -98,6 +98,22 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         }
     }
 
+    public func updatingEditableFields(
+        title: String,
+        username: String,
+        password: String,
+        url: String,
+        notes: String
+    ) -> KeePassEntry {
+        var updated = self
+        updated.title = title
+        updated.username = username
+        updated.password = password
+        updated.url = url
+        updated.notes = notes
+        return updated
+    }
+
     private var searchableValues: [String] {
         [title, username, url, notes] + customFields.map(\.value)
     }

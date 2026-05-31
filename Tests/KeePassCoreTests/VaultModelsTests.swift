@@ -24,6 +24,52 @@ final class VaultModelsTests: XCTestCase {
         XCTAssertEqual(entry.customFields.first?.name, "email")
     }
 
+    func testUpdatingEditableFieldsPreservesEntryMetadata() {
+        let entry = KeePassEntry(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            title: "Old",
+            username: "old-user",
+            password: "old-pass",
+            url: "https://old.example.com",
+            notes: "old notes",
+            customFields: [
+                KeePassField(name: "otp", value: "otpauth://totp/example?secret=GEZDGNBVGY3TQOJQ", isProtected: true)
+            ],
+            attachments: [
+                KeePassAttachment(name: "recovery.txt", data: Data("recovery".utf8), isProtected: false)
+            ],
+            history: [
+                KeePassEntry(
+                    id: UUID(uuidString: "11111111-2222-3333-4444-555555555555")!,
+                    title: "History",
+                    username: "history-user",
+                    password: "history-pass",
+                    url: "",
+                    notes: "",
+                    customFields: []
+                )
+            ]
+        )
+
+        let updated = entry.updatingEditableFields(
+            title: "New",
+            username: "new-user",
+            password: "new-pass",
+            url: "https://new.example.com",
+            notes: "new notes"
+        )
+
+        XCTAssertEqual(updated.id, entry.id)
+        XCTAssertEqual(updated.title, "New")
+        XCTAssertEqual(updated.username, "new-user")
+        XCTAssertEqual(updated.password, "new-pass")
+        XCTAssertEqual(updated.url, "https://new.example.com")
+        XCTAssertEqual(updated.notes, "new notes")
+        XCTAssertEqual(updated.customFields, entry.customFields)
+        XCTAssertEqual(updated.attachments, entry.attachments)
+        XCTAssertEqual(updated.history, entry.history)
+    }
+
     func testSearchMatchesNestedEntriesByCommonFields() {
         let matchingByURL = KeePassEntry.fixture(title: "Source", url: "https://github.com/openkeepass")
         let matchingByCustomField = KeePassEntry.fixture(title: "Server", customFields: [.init(name: "host", value: "vault.internal", isProtected: false)])

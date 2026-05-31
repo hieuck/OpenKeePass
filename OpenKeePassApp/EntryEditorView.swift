@@ -51,19 +51,33 @@ struct EntryEditorView: View {
         .toolbar {
             Button("Save") {
                 onSave(
-                    KeePassEntry(
-                        id: entry?.id ?? UUID(),
-                        title: title,
-                        username: username,
-                        password: password,
-                        url: url,
-                        notes: notes,
-                        customFields: entry?.customFields ?? []
-                    )
+                    editedEntry()
                 )
                 dismiss()
             }
                 .disabled(title.isEmpty)
         }
+    }
+
+    private func editedEntry() -> KeePassEntry {
+        if let entry {
+            return entry.updatingEditableFields(
+                title: title,
+                username: username,
+                password: password,
+                url: url,
+                notes: notes
+            )
+        }
+
+        return KeePassEntry(
+            id: UUID(),
+            title: title,
+            username: username,
+            password: password,
+            url: url,
+            notes: notes,
+            customFields: []
+        )
     }
 }
