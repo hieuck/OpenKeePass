@@ -385,6 +385,20 @@ final class KDBX4EngineTests: XCTestCase {
                         ],
                         attachments: [
                             KeePassAttachment(name: "recovery.txt", data: Data("recovery-code".utf8), isProtected: false)
+                        ],
+                        history: [
+                            KeePassEntry(
+                                id: UUID(uuidString: "99999999-8888-7777-6666-555555555555")!,
+                                title: "GitHub & GitLab",
+                                username: "previous-user",
+                                password: "previous-secret",
+                                url: "https://example.com",
+                                notes: "previous notes",
+                                customFields: [],
+                                attachments: [
+                                    KeePassAttachment(name: "old.txt", data: Data("old-attachment".utf8), isProtected: false)
+                                ]
+                            )
                         ]
                     )
                 ]
@@ -415,6 +429,14 @@ final class KDBX4EngineTests: XCTestCase {
             reopened.root.entries.first?.attachments,
             [
                 KeePassAttachment(name: "recovery.txt", data: Data("recovery-code".utf8), isProtected: false)
+            ]
+        )
+        XCTAssertEqual(reopened.root.entries.first?.history.first?.username, "previous-user")
+        XCTAssertEqual(reopened.root.entries.first?.history.first?.password, "previous-secret")
+        XCTAssertEqual(
+            reopened.root.entries.first?.history.first?.attachments,
+            [
+                KeePassAttachment(name: "old.txt", data: Data("old-attachment".utf8), isProtected: false)
             ]
         )
     }

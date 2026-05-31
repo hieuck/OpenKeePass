@@ -271,8 +271,28 @@ public struct KDBX4Engine: KDBXEngine {
         for attachment in entry.attachments.sorted(by: { $0.name < $1.name }) {
             xml.append(serializeAttachment(attachment, indent: indent + "  "))
         }
+        if !entry.history.isEmpty {
+            xml.append("\(indent)  <History>\n")
+            for historyEntry in entry.history {
+                xml.append(try serializeEntry(historyEntry, indent: indent + "    ", stream: &stream, includeHistory: false))
+            }
+            xml.append("\(indent)  </History>\n")
+        }
         xml.append("\(indent)</Entry>\n")
         return xml
+    }
+
+    private func serializeEntry(
+        _ entry: KeePassEntry,
+        indent: String,
+        stream: inout ChaCha20Stream,
+        includeHistory: Bool
+    ) throws -> String {
+        var entry = entry
+        if !includeHistory {
+            entry.history = []
+        }
+        return try serializeEntry(entry, indent: indent, stream: &stream)
     }
 
     private func serializeAttachment(_ attachment: KeePassAttachment, indent: String) -> String {

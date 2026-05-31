@@ -116,6 +116,34 @@ final class KeePassXMLParserTests: XCTestCase {
         ])
     }
 
+    func testParsesEntryHistory() throws {
+        let xml = """
+        <KeePassFile>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>GitHub</Value></String>
+                <String><Key>UserName</Key><Value>current-user</Value></String>
+                <History>
+                  <Entry>
+                    <String><Key>Title</Key><Value>GitHub</Value></String>
+                    <String><Key>UserName</Key><Value>previous-user</Value></String>
+                    <String><Key>Password</Key><Value>old-secret</Value></String>
+                  </Entry>
+                </History>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """
+
+        let vault = try KeePassXMLParser.parse(Data(xml.utf8))
+
+        XCTAssertEqual(vault.root.entries.first?.history.first?.username, "previous-user")
+        XCTAssertEqual(vault.root.entries.first?.history.first?.password, "old-secret")
+    }
+
     func testRejectsXMLWithoutRootGroup() {
         XCTAssertThrowsError(try KeePassXMLParser.parse(Data("<KeePassFile/>".utf8))) { error in
             XCTAssertEqual(error as? KDBXError, .corruptDatabase)

@@ -46,6 +46,7 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
     public var notes: String
     public var customFields: [KeePassField]
     public var attachments: [KeePassAttachment]
+    public var history: [KeePassEntry]
 
     public init(
         id: UUID,
@@ -55,7 +56,8 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         url: String,
         notes: String,
         customFields: [KeePassField],
-        attachments: [KeePassAttachment] = []
+        attachments: [KeePassAttachment] = [],
+        history: [KeePassEntry] = []
     ) {
         self.id = id
         self.title = title
@@ -65,6 +67,7 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         self.notes = notes
         self.customFields = customFields
         self.attachments = attachments
+        self.history = history
     }
 
     public init(
@@ -84,7 +87,8 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
             url: url,
             notes: notes,
             customFields: customFields,
-            attachments: []
+            attachments: [],
+            history: []
         )
     }
 

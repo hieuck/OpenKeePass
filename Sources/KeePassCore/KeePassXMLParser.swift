@@ -27,16 +27,17 @@ public enum KeePassXMLParser {
         let title = firstDirectText(in: xml, tag: "Name") ?? "Group"
         let childEntryXMLs = directElements(in: xml, tag: "Entry")
         let childGroupXMLs = directElements(in: xml, tag: "Group")
-        let entries = try childEntryXMLs.map(parseEntry)
+        let entries = try childEntryXMLs.map { try parseEntry($0, includeHistory: true) }
         let groups = try childGroupXMLs.map(parseGroup)
         return KeePassGroup(id: id, title: title, groups: groups, entries: entries)
     }
 
-    private static func parseEntry(_ xml: String) throws -> KeePassEntry {
+    private static func parseEntry(_ xml: String, includeHistory: Bool) throws -> KeePassEntry {
         let id = uuid(from: firstDirectText(in: xml, tag: "UUID")) ?? UUID()
+        let entryFieldsXML = removingDirectElements(tag: "History", from: xml)
         var fields: [String: KeePassField] = [:]
 
-        for stringXML in directElements(in: xml, tag: "String") {
+        for stringXML in directElements(in: entryFieldsXML, tag: "String") {
             guard let key = firstText(in: stringXML, tag: "Key"),
                   let valueElement = firstElement(in: stringXML, tag: "Value") else {
                 continue
@@ -52,7 +53,8 @@ public enum KeePassXMLParser {
             .filter { !standardKeys.contains($0.key) }
             .sorted { $0.key < $1.key }
             .map(\.value)
-        let attachments = try directElements(in: xml, tag: "Binary").compactMap(parseAttachment)
+        let attachments = try directElements(in: entryFieldsXML, tag: "Binary").compactMap(parseAttachment)
+        let history = includeHistory ? try parseHistory(in: xml) : []
 
         return KeePassEntry(
             id: id,
@@ -62,8 +64,16 @@ public enum KeePassXMLParser {
             url: fields["URL"]?.value ?? "",
             notes: fields["Notes"]?.value ?? "",
             customFields: customFields,
-            attachments: attachments
+            attachments: attachments,
+            history: history
         )
+    }
+
+    private static func parseHistory(in xml: String) throws -> [KeePassEntry] {
+        guard let historyXML = firstDirectElement(in: xml, tag: "History") else {
+            return []
+        }
+        return try directElements(in: historyXML, tag: "Entry").map { try parseEntry($0, includeHistory: false) }
     }
 
     private static func parseAttachment(_ xml: String) throws -> KeePassAttachment? {
@@ -187,6 +197,15 @@ public enum KeePassXMLParser {
             }
         }
 
+        return result
+    }
+
+    private static func removingDirectElements(tag: String, from xml: String) -> String {
+        var result = xml
+        while let element = firstDirectElement(in: result, tag: tag),
+              let range = result.range(of: element) {
+            result.removeSubrange(range)
+        }
         return result
     }
 
