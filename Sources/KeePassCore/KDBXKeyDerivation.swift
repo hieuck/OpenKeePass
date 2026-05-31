@@ -1,5 +1,8 @@
 import Foundation
 import CArgon2
+#if canImport(CommonCrypto)
+import CommonCrypto
+#endif
 
 public enum KDBXKeyDerivation {
     public static func transform(compositeKey: Data, parameters: KDBXKDFParameters) throws -> Data {
@@ -31,6 +34,9 @@ public enum KDBXKeyDerivation {
     }
 
     private static func aesTransform(compositeKey: Data, seed: Data, rounds: UInt64) throws -> Data {
+        #if canImport(CommonCrypto)
+        return try commonCryptoAESTransform(compositeKey: compositeKey, seed: seed, rounds: rounds)
+        #else
         let aes = try AES256(key: seed)
         var transformed = compositeKey
 
@@ -43,7 +49,61 @@ public enum KDBXKeyDerivation {
         }
 
         return SHA256.hash(transformed)
+        #endif
     }
+
+    #if canImport(CommonCrypto)
+    private static func commonCryptoAESTransform(compositeKey: Data, seed: Data, rounds: UInt64) throws -> Data {
+        var transformed = [UInt8](compositeKey)
+        var output = [UInt8](repeating: 0, count: transformed.count)
+        var cryptor: CCCryptorRef?
+
+        let createStatus = seed.withUnsafeBytes { seedBuffer in
+            CCCryptorCreateWithMode(
+                CCOperation(kCCEncrypt),
+                CCMode(kCCModeECB),
+                CCAlgorithm(kCCAlgorithmAES),
+                CCPadding(ccNoPadding),
+                nil,
+                seedBuffer.baseAddress,
+                seed.count,
+                nil,
+                0,
+                0,
+                0,
+                &cryptor
+            )
+        }
+        guard createStatus == kCCSuccess, let cryptor else {
+            throw KDBXError.corruptDatabase
+        }
+        defer {
+            CCCryptorRelease(cryptor)
+        }
+
+        for _ in 0..<rounds {
+            var bytesMoved = 0
+            let updateStatus = transformed.withUnsafeBytes { inputBuffer in
+                output.withUnsafeMutableBytes { outputBuffer in
+                    CCCryptorUpdate(
+                        cryptor,
+                        inputBuffer.baseAddress,
+                        transformed.count,
+                        outputBuffer.baseAddress,
+                        output.count,
+                        &bytesMoved
+                    )
+                }
+            }
+            guard updateStatus == kCCSuccess, bytesMoved == transformed.count else {
+                throw KDBXError.corruptDatabase
+            }
+            swap(&transformed, &output)
+        }
+
+        return SHA256.hash(Data(transformed))
+    }
+    #endif
 
     private static func argon2Transform(
         compositeKey: Data,
