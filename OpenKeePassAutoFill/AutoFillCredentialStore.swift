@@ -13,9 +13,12 @@ struct AutoFillCredentialStore {
         }
     }
 
+    func records(matching serviceIdentifiers: [ASCredentialServiceIdentifier] = []) -> [AutoFillCredentialRecord] {
+        (try? cache?.credentials(matchingServiceIdentifiers: serviceIdentifiers.map(\.identifier))) ?? []
+    }
+
     func credentialIdentities(matching serviceIdentifiers: [ASCredentialServiceIdentifier] = []) -> [ASPasswordCredentialIdentity] {
-        let records = (try? cache?.credentials(matchingServiceIdentifiers: serviceIdentifiers.map(\.identifier))) ?? []
-        return records.compactMap { record in
+        records(matching: serviceIdentifiers).compactMap { record in
             guard let host = record.serviceHost else {
                 return nil
             }
