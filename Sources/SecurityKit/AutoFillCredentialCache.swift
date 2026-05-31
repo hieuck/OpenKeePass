@@ -1,5 +1,5 @@
 import Foundation
-#if canImport(CryptoKit) && canImport(Security)
+#if canImport(CryptoKit) && canImport(Security) && os(iOS)
 import CryptoKit
 import Security
 #endif
@@ -177,7 +177,7 @@ private enum AutoFillCredentialCachePayload: Codable, Equatable {
     }
 }
 
-#if canImport(CryptoKit) && canImport(Security)
+#if canImport(CryptoKit) && canImport(Security) && os(iOS)
 public struct KeychainAutoFillCredentialCacheProtection: AutoFillCredentialCacheProtection {
     private let service = "dev.openkeepass.autofill-cache"
     private let account = "cache-encryption-key"
