@@ -1,9 +1,15 @@
 import Foundation
 
 public enum KeePassXMLParser {
-    public static func parse(_ data: Data) throws -> KeePassVault {
-        guard let xml = String(data: data, encoding: .utf8) else {
+    public static func parse(
+        _ data: Data,
+        protectedStream: KDBX4InnerHeader.ProtectedStream? = nil
+    ) throws -> KeePassVault {
+        guard var xml = String(data: data, encoding: .utf8) else {
             throw KDBXError.corruptDatabase
+        }
+        if let protectedStream {
+            xml = try decryptProtectedValues(in: xml, protectedStream: protectedStream)
         }
 
         let databaseName = firstText(in: xml, tag: "DatabaseName") ?? "KeePass"
@@ -187,5 +193,68 @@ public enum KeePassXMLParser {
             .replacingOccurrences(of: "&quot;", with: "\"")
             .replacingOccurrences(of: "&apos;", with: "'")
             .replacingOccurrences(of: "&amp;", with: "&")
+    }
+
+    private static func decryptProtectedValues(
+        in xml: String,
+        protectedStream: KDBX4InnerHeader.ProtectedStream
+    ) throws -> String {
+        var stream: ChaCha20Stream?
+        var result = ""
+        var cursor = xml.startIndex
+        let valuePrefix = "<Value"
+
+        while let valueStart = xml[cursor...].range(of: valuePrefix)?.lowerBound {
+            guard let openEnd = xml[valueStart...].firstIndex(of: ">") else {
+                throw KDBXError.corruptDatabase
+            }
+            let openTag = String(xml[valueStart...openEnd])
+            let contentStart = xml.index(after: openEnd)
+            guard let closeRange = xml[contentStart...].range(of: "</Value>") else {
+                throw KDBXError.corruptDatabase
+            }
+
+            result.append(contentsOf: xml[cursor..<contentStart])
+            let content = String(xml[contentStart..<closeRange.lowerBound])
+            if isProtectedValueTag(openTag) {
+                guard protectedStream.algorithm == .chaCha20 else {
+                    throw KDBXError.unsupportedFeature("Salsa20 protected values are not implemented yet")
+                }
+                if stream == nil {
+                    stream = try ChaCha20Stream.protectedValueStream(innerKey: protectedStream.key)
+                }
+
+                let encryptedBase64 = decodeXML(content.trimmingCharacters(in: .whitespacesAndNewlines))
+                guard let encrypted = Data(base64Encoded: encryptedBase64) else {
+                    throw KDBXError.corruptDatabase
+                }
+                let decrypted = try stream!.apply(to: encrypted)
+                guard let decryptedValue = String(data: decrypted, encoding: .utf8) else {
+                    throw KDBXError.corruptDatabase
+                }
+                result.append(encodeXML(decryptedValue))
+            } else {
+                result.append(content)
+            }
+
+            cursor = closeRange.lowerBound
+        }
+
+        result.append(contentsOf: xml[cursor...])
+        return result
+    }
+
+    private static func isProtectedValueTag(_ tag: String) -> Bool {
+        tag.localizedCaseInsensitiveContains("Protected=\"True\"")
+            || tag.localizedCaseInsensitiveContains("Protected=\"true\"")
+    }
+
+    private static func encodeXML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
+            .replacingOccurrences(of: "'", with: "&apos;")
     }
 }

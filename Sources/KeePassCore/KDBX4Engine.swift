@@ -38,9 +38,9 @@ public struct KDBX4Engine: KDBXEngine {
                 finalKey: finalKey,
                 encryptionIV: encryptionIV
             )
-            let payload = try KDBX4InnerHeader.strip(from: decryptedPayload)
-            let xml = try KDBXPayloadCompression.decode(payload, compression: header.compression)
-            return try KeePassXMLParser.parse(xml)
+            let innerHeader = try KDBX4InnerHeader.parse(decryptedPayload)
+            let xml = try KDBXPayloadCompression.decode(innerHeader.body, compression: header.compression)
+            return try KeePassXMLParser.parse(xml, protectedStream: innerHeader.protectedStream)
         }
 
         throw KDBXError.unsupportedFeature("KDBX 4 payload decryption is not implemented yet")

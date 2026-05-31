@@ -66,6 +66,34 @@ final class KeePassXMLParserTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.customFields, [KeePassField]())
     }
 
+    func testDecryptsProtectedValuesWithChaCha20StreamInDocumentOrder() throws {
+        let innerKey = Data(0x00...0x3F)
+        var stream = try ChaCha20Stream.protectedValueStream(innerKey: innerKey)
+        let encryptedPassword = try stream.apply(to: Data("secret".utf8)).base64EncodedString()
+        let encryptedNotes = try stream.apply(to: Data("notes".utf8)).base64EncodedString()
+        let xml = """
+        <KeePassFile>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Password</Key><Value Protected="True">\(encryptedPassword)</Value></String>
+                <String><Key>Notes</Key><Value Protected="True">\(encryptedNotes)</Value></String>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """
+
+        let vault = try KeePassXMLParser.parse(
+            Data(xml.utf8),
+            protectedStream: .init(algorithm: .chaCha20, key: innerKey)
+        )
+
+        XCTAssertEqual(vault.root.entries.first?.password, "secret")
+        XCTAssertEqual(vault.root.entries.first?.notes, "notes")
+    }
+
     func testRejectsXMLWithoutRootGroup() {
         XCTAssertThrowsError(try KeePassXMLParser.parse(Data("<KeePassFile/>".utf8))) { error in
             XCTAssertEqual(error as? KDBXError, .corruptDatabase)

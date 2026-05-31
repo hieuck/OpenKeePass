@@ -149,6 +149,69 @@ final class KDBX4EngineTests: XCTestCase {
         XCTAssertEqual(vault.root.entries.first?.password, "pass")
     }
 
+    func testOpenWithProtectedPasswordValueReturnsDecryptedPassword() async throws {
+        let engine = KDBX4Engine()
+        let credentials = KDBXCredentials(password: "pw")
+        let masterSeed = Data(repeating: 0xA5, count: 32)
+        let transformSeed = Data(repeating: 0x01, count: 32)
+        let innerKey = Data(0x00...0x3F)
+        var protectedStream = try ChaCha20Stream.protectedValueStream(innerKey: innerKey)
+        let encryptedPassword = try protectedStream.apply(to: Data("stream-secret".utf8)).base64EncodedString()
+        let iv = Data(repeating: 0x02, count: 16)
+        let composite = try KDBXCompositeKey.material(from: credentials)
+        let transformed = try KDBXKeyDerivation.transform(compositeKey: composite, parameters: .aes(seed: transformSeed, rounds: 1))
+        let finalKey = KDBXKeyDerivation.finalKey(masterSeed: masterSeed, transformedKey: transformed)
+        let xml = Data("""
+        <KeePassFile>
+          <Meta><DatabaseName>Protected</DatabaseName></Meta>
+          <Root>
+            <Group>
+              <Name>Root</Name>
+              <Entry>
+                <String><Key>Title</Key><Value>Protected Entry</Value></String>
+                <String><Key>Password</Key><Value Protected="True">\(encryptedPassword)</Value></String>
+              </Entry>
+            </Group>
+          </Root>
+        </KeePassFile>
+        """.utf8)
+        var plaintext = Data()
+        var innerAlgorithm = Data()
+        innerAlgorithm.appendUInt32LE(3)
+        plaintext.appendInnerHeaderField(id: 1, payload: innerAlgorithm)
+        plaintext.appendInnerHeaderField(id: 2, payload: innerKey)
+        plaintext.appendInnerHeaderField(id: 0, payload: Data())
+        plaintext.append(xml)
+        let paddingLength = 16 - (plaintext.count % 16)
+        let ciphertext = try AES256(key: finalKey).encryptCBC(
+            plaintext + Data(repeating: UInt8(paddingLength), count: paddingLength),
+            iv: iv
+        )
+
+        var framedPayload = Data()
+        framedPayload.appendKDBX4Block(index: 0, payload: ciphertext) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+        framedPayload.appendKDBX4Block(index: 1, payload: Data()) { index in
+            KDBX4HMACKeyDerivation.blockKey(index: index, masterSeed: masterSeed, transformedKey: transformed)
+        }
+
+        var data = Data.kdbx4AESHeader(masterSeed: masterSeed, transformSeed: transformSeed, iv: iv)
+        let header = data
+        data.append(SHA256.hash(header))
+        data.append(HMACSHA256.authenticate(
+            message: header,
+            key: KDBX4HMACKeyDerivation.headerKey(masterSeed: masterSeed, transformedKey: transformed)
+        ))
+        data.append(framedPayload)
+
+        let vault = try await engine.open(data: data, credentials: credentials)
+
+        XCTAssertEqual(vault.name, "Protected")
+        XCTAssertEqual(vault.root.entries.first?.title, "Protected Entry")
+        XCTAssertEqual(vault.root.entries.first?.password, "stream-secret")
+    }
+
     func testOpenWithGzipCompressedKDBX4PayloadReturnsParsedVault() async throws {
         let engine = KDBX4Engine()
         let credentials = KDBXCredentials(password: "pw")

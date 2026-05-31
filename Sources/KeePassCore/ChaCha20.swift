@@ -15,18 +15,25 @@ public struct ChaCha20: Sendable {
     }
 
     public func apply(to data: Data) throws -> Data {
+        try apply(to: data, startingAtByteOffset: 0)
+    }
+
+    public func apply(to data: Data, startingAtByteOffset byteOffset: UInt64) throws -> Data {
         var output = Data(capacity: data.count)
-        var counter = initialCounter
+        var counter = initialCounter &+ UInt32(byteOffset / 64)
+        var blockOffset = Int(byteOffset % 64)
         var offset = 0
 
         while offset < data.count {
             let block = block(counter: counter)
-            let byteCount = min(64, data.count - offset)
+            let byteCount = min(64 - blockOffset, data.count - offset)
             for index in 0..<byteCount {
-                output.append(data[offset + index] ^ block[index])
+                let inputIndex = data.index(data.startIndex, offsetBy: offset + index)
+                output.append(data[inputIndex] ^ block[blockOffset + index])
             }
             offset += byteCount
             counter &+= 1
+            blockOffset = 0
         }
 
         return output
@@ -89,5 +96,33 @@ public struct ChaCha20: Sendable {
 
     private func rotateLeft(_ value: UInt32, by shift: UInt32) -> UInt32 {
         (value << shift) | (value >> (32 - shift))
+    }
+}
+
+public struct ChaCha20Stream: Sendable {
+    private let cipher: ChaCha20
+    private var byteOffset: UInt64 = 0
+
+    public init(key: Data, nonce: Data, initialCounter: UInt32 = 0) throws {
+        cipher = try ChaCha20(key: key, nonce: nonce, initialCounter: initialCounter)
+    }
+
+    public static func protectedValueStream(innerKey: Data) throws -> ChaCha20Stream {
+        guard innerKey.count == 64 else {
+            throw KDBXError.corruptDatabase
+        }
+
+        let hashedKey = SHA512.hash(innerKey)
+        return try ChaCha20Stream(
+            key: hashedKey.subdata(in: 0..<32),
+            nonce: hashedKey.subdata(in: 32..<44),
+            initialCounter: 0
+        )
+    }
+
+    public mutating func apply(to data: Data) throws -> Data {
+        let output = try cipher.apply(to: data, startingAtByteOffset: byteOffset)
+        byteOffset += UInt64(data.count)
+        return output
     }
 }
