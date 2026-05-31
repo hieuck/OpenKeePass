@@ -112,7 +112,9 @@ final class KDBX4EngineTests: XCTestCase {
         </KeePassFile>
         """.utf8)
         var plaintext = Data()
-        plaintext.appendInnerHeaderField(id: 1, payload: Data([0x02]))
+        var innerAlgorithm = Data()
+        innerAlgorithm.appendUInt32LE(2)
+        plaintext.appendInnerHeaderField(id: 1, payload: innerAlgorithm)
         plaintext.appendInnerHeaderField(id: 2, payload: Data(repeating: 0xA5, count: 32))
         plaintext.appendInnerHeaderField(id: 0, payload: Data())
         plaintext.append(xml)
@@ -175,7 +177,9 @@ final class KDBX4EngineTests: XCTestCase {
             0xEF, 0xAF, 0xE6, 0x97, 0x78, 0x01, 0x00, 0x00
         ])
         var plaintext = Data()
-        plaintext.appendInnerHeaderField(id: 1, payload: Data([0x02]))
+        var innerAlgorithm = Data()
+        innerAlgorithm.appendUInt32LE(2)
+        plaintext.appendInnerHeaderField(id: 1, payload: innerAlgorithm)
         plaintext.appendInnerHeaderField(id: 2, payload: Data(repeating: 0xA5, count: 32))
         plaintext.appendInnerHeaderField(id: 0, payload: Data())
         plaintext.append(compressedXML)

@@ -5,7 +5,9 @@ import XCTest
 final class KDBX4InnerHeaderTests: XCTestCase {
     func testStripsInnerHeaderAndReturnsBody() throws {
         var data = Data()
-        data.appendInnerHeaderField(id: 1, payload: Data([0x02]))
+        var algorithm = Data()
+        algorithm.appendUInt32LE(2)
+        data.appendInnerHeaderField(id: 1, payload: algorithm)
         data.appendInnerHeaderField(id: 2, payload: Data(repeating: 0xA5, count: 32))
         data.appendInnerHeaderField(id: 0, payload: Data())
         data.append(Data("<KeePassFile />".utf8))
@@ -13,6 +15,23 @@ final class KDBX4InnerHeaderTests: XCTestCase {
         let body = try KDBX4InnerHeader.strip(from: data)
 
         XCTAssertEqual(String(data: body, encoding: .utf8), "<KeePassFile />")
+    }
+
+    func testParsesInnerHeaderMetadata() throws {
+        var data = Data()
+        var algorithm = Data()
+        algorithm.appendUInt32LE(3)
+        let key = Data(repeating: 0xA5, count: 64)
+        data.appendInnerHeaderField(id: 1, payload: algorithm)
+        data.appendInnerHeaderField(id: 2, payload: key)
+        data.appendInnerHeaderField(id: 0, payload: Data())
+        data.append(Data("<KeePassFile />".utf8))
+
+        let parsed = try KDBX4InnerHeader.parse(data)
+
+        XCTAssertEqual(parsed.body, Data("<KeePassFile />".utf8))
+        XCTAssertEqual(parsed.protectedStream?.algorithm, .chaCha20)
+        XCTAssertEqual(parsed.protectedStream?.key, key)
     }
 
     func testReturnsOriginalDataWhenNoInnerHeaderIsPresent() throws {
