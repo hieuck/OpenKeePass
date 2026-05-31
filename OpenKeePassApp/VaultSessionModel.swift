@@ -1,6 +1,8 @@
+import AuthenticationServices
 import Combine
 import Foundation
 import KeePassCore
+import SecurityKit
 import VaultStore
 
 @MainActor
@@ -34,6 +36,7 @@ final class VaultSessionModel: ObservableObject {
             self.credentials = credentials
             vault = store.unlockedVault
             isDirty = store.isDirty
+            exportAutoFillCredentials()
         } catch {
             errorMessage = UnlockErrorMessage.describe(error)
             throw error
@@ -64,6 +67,7 @@ final class VaultSessionModel: ObservableObject {
             try data.write(to: fileURL, options: .atomic)
             vault = store.unlockedVault
             isDirty = store.isDirty
+            exportAutoFillCredentials()
         } catch {
             errorMessage = "Could not save this vault."
         }
@@ -74,6 +78,7 @@ final class VaultSessionModel: ObservableObject {
             try store.addEntry(entry, toGroup: groupID)
             vault = store.unlockedVault
             isDirty = store.isDirty
+            exportAutoFillCredentials()
         } catch {
             errorMessage = "Could not add this entry."
         }
@@ -86,6 +91,7 @@ final class VaultSessionModel: ObservableObject {
             }
             vault = store.unlockedVault
             isDirty = store.isDirty
+            exportAutoFillCredentials()
         } catch {
             errorMessage = "Could not update this entry."
         }
@@ -97,6 +103,60 @@ final class VaultSessionModel: ObservableObject {
 
     func entry(id entryID: UUID) -> KeePassEntry? {
         vault?.root.entry(id: entryID)
+    }
+
+    private func exportAutoFillCredentials() {
+        guard let vault, let directory = AppGroupContainer().url() else {
+            return
+        }
+
+        let records = vault.root.flattenedEntries().compactMap { entry -> AutoFillCredentialRecord? in
+            let username = entry.username.trimmingCharacters(in: .whitespacesAndNewlines)
+            let password = entry.password.trimmingCharacters(in: .whitespacesAndNewlines)
+            let url = entry.url.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            guard !username.isEmpty, !password.isEmpty, URL(string: url)?.host != nil else {
+                return nil
+            }
+
+            return AutoFillCredentialRecord(
+                id: entry.id.uuidString,
+                title: entry.title,
+                username: entry.username,
+                password: entry.password,
+                url: entry.url
+            )
+        }
+
+        do {
+            try AutoFillCredentialCache(directory: directory).write(records)
+            replaceAutoFillIdentities(with: records)
+        } catch {
+            errorMessage = "Could not update AutoFill credentials."
+        }
+    }
+
+    private func replaceAutoFillIdentities(with records: [AutoFillCredentialRecord]) {
+        let identities = records.compactMap { record -> ASPasswordCredentialIdentity? in
+            guard let host = record.serviceHost else {
+                return nil
+            }
+            let service = ASCredentialServiceIdentifier(identifier: host, type: .domain)
+            return ASPasswordCredentialIdentity(
+                serviceIdentifier: service,
+                user: record.username,
+                recordIdentifier: record.id
+            )
+        }
+
+        ASCredentialIdentityStore.shared.replaceCredentialIdentities(with: identities) { [weak self] success, _ in
+            guard !success else {
+                return
+            }
+            DispatchQueue.main.async {
+                self?.errorMessage = "Could not update AutoFill suggestions."
+            }
+        }
     }
 }
 
