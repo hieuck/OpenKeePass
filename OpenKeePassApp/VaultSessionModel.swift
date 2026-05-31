@@ -19,7 +19,7 @@ final class VaultSessionModel: ObservableObject {
         self.fileURL = fileURL
     }
 
-    func unlock(data: Data, password: String) async throws {
+    func unlock(data: Data, password: String, keyFileData: Data? = nil) async throws {
         isUnlocking = true
         vault = nil
         isDirty = false
@@ -29,7 +29,7 @@ final class VaultSessionModel: ObservableObject {
         }
 
         do {
-            let credentials = KDBXCredentials(password: password)
+            let credentials = KDBXCredentials(password: password, keyFileData: keyFileData)
             try await store.unlock(data: data, credentials: credentials)
             self.credentials = credentials
             vault = store.unlockedVault

@@ -2,6 +2,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DocumentPicker: UIViewControllerRepresentable {
+    var contentTypes: [UTType] = [UTType(filenameExtension: "kdbx") ?? .data]
     var onPick: (URL) -> Void
 
     func makeCoordinator() -> Coordinator {
@@ -9,8 +10,7 @@ struct DocumentPicker: UIViewControllerRepresentable {
     }
 
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let kdbxType = UTType(filenameExtension: "kdbx") ?? .data
-        let controller = UIDocumentPickerViewController(forOpeningContentTypes: [kdbxType], asCopy: false)
+        let controller = UIDocumentPickerViewController(forOpeningContentTypes: contentTypes, asCopy: false)
         controller.delegate = context.coordinator
         return controller
     }
