@@ -1,10 +1,12 @@
 import KeePassCore
 import PasswordTools
+import SecurityKit
 import SwiftUI
 import UIKit
 
 struct EntryDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("security.clipboardSeconds") private var clipboardSeconds = 30.0
     @ObservedObject var model: VaultSessionModel
     let entryID: UUID
     @State private var isConfirmingDelete = false
@@ -23,7 +25,7 @@ struct EntryDetailView: View {
                         Text("••••••••")
                         Spacer()
                         Button {
-                            UIPasteboard.general.string = entry.password
+                            copyToClipboard(entry.password)
                         } label: {
                             Image(systemName: "doc.on.doc")
                         }
@@ -38,11 +40,11 @@ struct EntryDetailView: View {
                 }
 
                 if let otpConfiguration = try? TOTPConfiguration(keePassFields: entry.customFields.map { (name: $0.name, value: $0.value) }) {
-                    OneTimePasswordSection(configuration: otpConfiguration)
+                    OneTimePasswordSection(configuration: otpConfiguration, copyToClipboard: copyToClipboard)
                 }
 
                 if !entry.displayableCustomFields.isEmpty {
-                    CustomFieldsSection(fields: entry.displayableCustomFields)
+                    CustomFieldsSection(fields: entry.displayableCustomFields, copyToClipboard: copyToClipboard)
                 }
 
                 if !entry.attachments.isEmpty {
@@ -80,10 +82,19 @@ struct EntryDetailView: View {
                 .navigationTitle("Entry")
         }
     }
+
+    private func copyToClipboard(_ value: String) {
+        ClipboardService(
+            pasteboard: SystemPasteboard(),
+            scheduler: DispatchClipboardScheduler()
+        )
+        .copy(value, expiration: clipboardSeconds)
+    }
 }
 
 private struct CustomFieldsSection: View {
     let fields: [KeePassField]
+    let copyToClipboard: (String) -> Void
 
     var body: some View {
         Section("Custom Fields") {
@@ -95,7 +106,7 @@ private struct CustomFieldsSection: View {
                     }
                     Spacer()
                     Button {
-                        UIPasteboard.general.string = field.copyValue
+                        copyToClipboard(field.copyValue)
                     } label: {
                         Image(systemName: "doc.on.doc")
                     }
@@ -198,6 +209,7 @@ private struct ActivityView: UIViewControllerRepresentable {
 
 private struct OneTimePasswordSection: View {
     let configuration: TOTPConfiguration
+    let copyToClipboard: (String) -> Void
     private let generator = TOTPGenerator()
 
     var body: some View {
@@ -213,7 +225,7 @@ private struct OneTimePasswordSection: View {
                             .textSelection(.enabled)
                         Spacer()
                         Button {
-                            UIPasteboard.general.string = code
+                            copyToClipboard(code)
                         } label: {
                             Image(systemName: "doc.on.doc")
                         }
