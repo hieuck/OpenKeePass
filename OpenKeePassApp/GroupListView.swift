@@ -16,10 +16,12 @@ struct GroupListView: View {
 }
 
 private struct GroupContentView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: VaultSessionModel
     let vaultName: String
     let group: KeePassGroup
     @State private var searchText = ""
+    @State private var isConfirmingDelete = false
 
     var filteredEntries: [KeePassEntry] {
         guard !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -28,6 +30,10 @@ private struct GroupContentView: View {
         return group.flattenedEntries().filter { entry in
             entry.matches(searchText.lowercased())
         }
+    }
+
+    private var isRootGroup: Bool {
+        model.vault?.root.id == group.id
     }
 
     var body: some View {
@@ -83,13 +89,46 @@ private struct GroupContentView: View {
                 .disabled(!model.isDirty || model.isSaving)
                 .accessibilityLabel("Save Vault")
 
-                NavigationLink(destination: EntryEditorView(entry: nil) { entry in
-                    model.addEntry(entry, toGroup: group.id)
-                }) {
+                Menu {
+                    NavigationLink(destination: EntryEditorView(entry: nil) { entry in
+                        model.addEntry(entry, toGroup: group.id)
+                    }) {
+                        Label("New Entry", systemImage: "person.crop.circle.badge.plus")
+                    }
+
+                    NavigationLink(destination: GroupEditorView(navigationTitle: "New Group", actionTitle: "Add") { title in
+                        model.addGroup(title: title, toParent: group.id)
+                    }) {
+                        Label("New Group", systemImage: "folder.badge.plus")
+                    }
+
+                    NavigationLink(destination: GroupEditorView(title: group.title, navigationTitle: "Rename Group", actionTitle: "Save") { title in
+                        model.renameGroup(id: group.id, title: title)
+                    }) {
+                        Label("Rename Group", systemImage: "pencil")
+                    }
+                    .disabled(isRootGroup)
+
+                    Button(role: .destructive) {
+                        isConfirmingDelete = true
+                    } label: {
+                        Label("Delete Group", systemImage: "trash")
+                    }
+                    .disabled(isRootGroup)
+                } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("Add Entry")
+                .accessibilityLabel("Vault Actions")
             }
+        }
+        .confirmationDialog("Delete this group?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+            Button("Delete Group", role: .destructive) {
+                model.deleteGroup(id: group.id)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes the group and its entries from the unlocked vault. Save the vault to write the deletion to the .kdbx file.")
         }
     }
 }

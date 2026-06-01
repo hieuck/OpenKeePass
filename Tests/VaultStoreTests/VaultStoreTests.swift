@@ -116,6 +116,21 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertEqual(unlocked.root.groups, [])
         XCTAssertEqual(store.isDirty, true)
     }
+
+    func testUpdatingNestedGroupMarksVaultDirty() async throws {
+        let nestedGroup = KeePassGroup.fixture(title: "Personal")
+        let vault = KeePassVault.fixture(groups: [nestedGroup])
+        let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))
+        try await store.unlock(data: Data([1]), credentials: .init(password: "pw"))
+
+        try store.updateGroup(id: nestedGroup.id) { group in
+            group.title = "Work"
+        }
+
+        let unlocked = try XCTUnwrap(store.unlockedVault)
+        XCTAssertEqual(unlocked.root.groups.first?.title, "Work")
+        XCTAssertEqual(store.isDirty, true)
+    }
 }
 
 private struct FakeKDBXEngine: KDBXEngine {

@@ -89,6 +89,16 @@ public final class VaultStore {
         state = .unlocked(vault: vault, isDirty: true)
     }
 
+    public func updateGroup(id groupID: UUID, mutate: (inout KeePassGroup) -> Void) throws {
+        guard case .unlocked(var vault, _) = state else {
+            throw VaultStoreError.noUnlockedVault
+        }
+        guard vault.root.updateGroup(id: groupID, mutate: mutate) else {
+            throw VaultStoreError.groupNotFound(groupID)
+        }
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
     public func deleteGroup(id: UUID) throws {
         guard case .unlocked(var vault, _) = state else {
             throw VaultStoreError.noUnlockedVault
@@ -163,6 +173,21 @@ private extension KeePassGroup {
 
         for groupIndex in groups.indices {
             if groups[groupIndex].addGroup(group, toParent: parentID) {
+                return true
+            }
+        }
+
+        return false
+    }
+
+    mutating func updateGroup(id groupID: UUID, mutate: (inout KeePassGroup) -> Void) -> Bool {
+        if id == groupID {
+            mutate(&self)
+            return true
+        }
+
+        for groupIndex in groups.indices {
+            if groups[groupIndex].updateGroup(id: groupID, mutate: mutate) {
                 return true
             }
         }

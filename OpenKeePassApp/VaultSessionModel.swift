@@ -108,6 +108,51 @@ final class VaultSessionModel: ObservableObject {
         }
     }
 
+    func addGroup(title: String, toParent parentID: UUID) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "Group name is required."
+            return
+        }
+
+        do {
+            let group = KeePassGroup(id: UUID(), title: trimmedTitle, groups: [], entries: [])
+            try store.addGroup(group, toParent: parentID)
+            vault = store.unlockedVault
+            isDirty = store.isDirty
+        } catch {
+            errorMessage = "Could not add this group."
+        }
+    }
+
+    func renameGroup(id groupID: UUID, title: String) {
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "Group name is required."
+            return
+        }
+
+        do {
+            try store.updateGroup(id: groupID) { group in
+                group.title = trimmedTitle
+            }
+            vault = store.unlockedVault
+            isDirty = store.isDirty
+        } catch {
+            errorMessage = "Could not rename this group."
+        }
+    }
+
+    func deleteGroup(id groupID: UUID) {
+        do {
+            try store.deleteGroup(id: groupID)
+            vault = store.unlockedVault
+            isDirty = store.isDirty
+        } catch {
+            errorMessage = "Could not delete this group."
+        }
+    }
+
     func group(id groupID: UUID) -> KeePassGroup? {
         vault?.root.group(id: groupID)
     }
