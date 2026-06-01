@@ -23,4 +23,9 @@ final class AutoLockPolicyTests: XCTestCase {
 
         XCTAssertTrue(policy.shouldLock(now: Date(timeIntervalSince1970: 400), lastInactiveAt: lastInactiveAt))
     }
+
+    func testManualLockIsAvailableOnlyWhenProtectionIsEnabled() {
+        XCTAssertTrue(AutoLockPolicy(isEnabled: true, timeout: 300).canLockManually)
+        XCTAssertFalse(AutoLockPolicy(isEnabled: false, timeout: 300).canLockManually)
+    }
 }

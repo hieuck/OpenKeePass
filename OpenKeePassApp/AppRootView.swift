@@ -25,7 +25,8 @@ struct AppRootView: View {
                 isImportingVault: $isImportingVault,
                 isCreatingVault: $isCreatingVault,
                 isShowingSettings: $isShowingSettings,
-                forgetSelectedVault: forgetSelectedVault
+                forgetSelectedVault: forgetSelectedVault,
+                lockNow: manualLockAction
             )
             Text("Select a vault")
                 .foregroundColor(.secondary)
@@ -85,6 +86,14 @@ struct AppRootView: View {
         )
     }
 
+    private var manualLockAction: (() -> Void)? {
+        let policy = AutoLockPolicy(isEnabled: biometricUnlock, timeout: autoLockMinutes * 60)
+        guard selectedVault != nil, policy.canLockManually else {
+            return nil
+        }
+        return lockNow
+    }
+
     private func selectVault(_ url: URL) {
         selectedVault = VaultReference(url: url)
         do {
@@ -97,6 +106,12 @@ struct AppRootView: View {
     private func forgetSelectedVault() {
         bookmarkStore.clear()
         selectedVault = nil
+    }
+
+    private func lockNow() {
+        isLocked = true
+        lockMessage = nil
+        lastInactiveAt = nil
     }
 
     private func handleScenePhaseChange(_ phase: ScenePhase) {

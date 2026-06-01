@@ -9,6 +9,10 @@ public struct AutoLockPolicy: Equatable, Sendable {
         self.timeout = timeout
     }
 
+    public var canLockManually: Bool {
+        isEnabled
+    }
+
     public func shouldLock(now: Date, lastInactiveAt: Date?) -> Bool {
         guard isEnabled, timeout > 0, let lastInactiveAt else {
             return false

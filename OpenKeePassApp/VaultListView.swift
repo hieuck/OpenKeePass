@@ -6,6 +6,7 @@ struct VaultListView: View {
     @Binding var isCreatingVault: Bool
     @Binding var isShowingSettings: Bool
     var forgetSelectedVault: () -> Void = {}
+    var lockNow: (() -> Void)?
 
     var body: some View {
         List {
@@ -39,7 +40,16 @@ struct VaultListView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("OpenKeePass")
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if let lockNow {
+                    Button {
+                        lockNow()
+                    } label: {
+                        Image(systemName: "lock")
+                    }
+                    .accessibilityLabel("Lock Now")
+                }
+
                 Button {
                     isShowingSettings = true
                 } label: {

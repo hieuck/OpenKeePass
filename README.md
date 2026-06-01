@@ -4,7 +4,7 @@ OpenKeePass is a native iOS KeePass-compatible password manager. The project goa
 
 ## Scope
 
-The MVP targets iOS 15 and newer. It supports real KeePass `.kdbx` vaults, key files, local device authentication after auto-lock, clipboard timeout, AutoFill scaffolding, and GitHub Actions `.ipa` artifacts.
+The MVP targets iOS 15 and newer. It supports real KeePass `.kdbx` vaults, key files, local device authentication after auto-lock or manual lock, clipboard timeout, AutoFill scaffolding, and GitHub Actions `.ipa` artifacts.
 
 ## Local Development
 
