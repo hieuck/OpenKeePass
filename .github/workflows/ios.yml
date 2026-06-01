@@ -12,13 +12,16 @@ jobs:
   build:
     name: Build and Package IPA
     runs-on: macos-15
+    permissions:
+      contents: read
     env:
       DERIVED_DATA: ${{ github.workspace }}/DerivedData
       BUILD_DIR: ${{ github.workspace }}/build
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Select Xcode
         run: sudo xcode-select -s /Applications/Xcode.app
@@ -55,14 +58,14 @@ jobs:
           (cd "$BUILD_DIR" && zip -qry OpenKeePass-unsigned.ipa Payload)
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: OpenKeePass-unsigned-ipa
           path: build/OpenKeePass-unsigned.ipa
           if-no-files-found: error
 
       - name: Upload build log
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: OpenKeePass-build-log
           path: build-xcodebuild.log
