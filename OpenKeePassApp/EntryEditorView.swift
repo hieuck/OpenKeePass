@@ -1,6 +1,7 @@
 import KeePassCore
 import PasswordTools
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct EntryEditorView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,6 +14,9 @@ struct EntryEditorView: View {
     @State private var url: String
     @State private var notes: String
     @State private var customFields: [EditableCustomField]
+    @State private var attachments: [EditableAttachment]
+    @State private var isImportingAttachment = false
+    @State private var attachmentErrorMessage: String?
 
     init(entry: KeePassEntry?, onSave: @escaping (KeePassEntry) -> Void) {
         self.entry = entry
@@ -23,6 +27,7 @@ struct EntryEditorView: View {
         _url = State(initialValue: entry?.url ?? "")
         _notes = State(initialValue: entry?.notes ?? "")
         _customFields = State(initialValue: (entry?.customFields ?? []).map(EditableCustomField.init(field:)))
+        _attachments = State(initialValue: (entry?.attachments ?? []).map(EditableAttachment.init(attachment:)))
     }
 
     var body: some View {
@@ -88,8 +93,50 @@ struct EntryEditorView: View {
                     Label("Add Field", systemImage: "plus")
                 }
             }
+
+            Section("Attachments") {
+                ForEach($attachments) { $attachment in
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("File Name", text: $attachment.name)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+
+                        HStack {
+                            Text(attachment.byteCountDescription)
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            Toggle("Protected", isOn: $attachment.isProtected)
+                        }
+
+                        Button(role: .destructive) {
+                            removeAttachment(id: attachment.id)
+                        } label: {
+                            Label("Delete Attachment", systemImage: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Button {
+                    isImportingAttachment = true
+                } label: {
+                    Label("Add Attachment", systemImage: "paperclip")
+                }
+
+                if let attachmentErrorMessage {
+                    Text(attachmentErrorMessage)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+            }
         }
         .navigationTitle(entry == nil ? "New Entry" : "Edit Entry")
+        .fileImporter(isPresented: $isImportingAttachment, allowedContentTypes: [.item], allowsMultipleSelection: true) { result in
+            importAttachments(result)
+        }
         .toolbar {
             Button("Save") {
                 onSave(
@@ -109,7 +156,8 @@ struct EntryEditorView: View {
                 password: password,
                 url: url,
                 notes: notes,
-                customFields: sanitizedCustomFields()
+                customFields: sanitizedCustomFields(),
+                attachments: sanitizedAttachments()
             )
         }
 
@@ -120,7 +168,8 @@ struct EntryEditorView: View {
             password: password,
             url: url,
             notes: notes,
-            customFields: sanitizedCustomFields()
+            customFields: sanitizedCustomFields(),
+            attachments: sanitizedAttachments()
         )
     }
 
@@ -133,6 +182,43 @@ struct EntryEditorView: View {
             let name = field.name.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !name.isEmpty else { return nil }
             return KeePassField(name: name, value: field.value, isProtected: field.isProtected)
+        }
+    }
+
+    private func removeAttachment(id: UUID) {
+        attachments.removeAll { $0.id == id }
+    }
+
+    private func sanitizedAttachments() -> [KeePassAttachment] {
+        attachments.compactMap { attachment in
+            let name = attachment.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            return KeePassAttachment(name: name, data: attachment.data, isProtected: attachment.isProtected)
+        }
+    }
+
+    private func importAttachments(_ result: Result<[URL], Error>) {
+        do {
+            for url in try result.get() {
+                let didStartAccess = url.startAccessingSecurityScopedResource()
+                defer {
+                    if didStartAccess {
+                        url.stopAccessingSecurityScopedResource()
+                    }
+                }
+
+                let data = try Data(contentsOf: url)
+                attachments.append(
+                    EditableAttachment(
+                        name: url.lastPathComponent,
+                        data: data,
+                        isProtected: false
+                    )
+                )
+            }
+            attachmentErrorMessage = nil
+        } catch {
+            attachmentErrorMessage = "Could not import selected attachment."
         }
     }
 }
@@ -152,5 +238,27 @@ private struct EditableCustomField: Identifiable, Equatable {
 
     init(field: KeePassField) {
         self.init(name: field.name, value: field.value, isProtected: field.isProtected)
+    }
+}
+
+private struct EditableAttachment: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var data: Data
+    var isProtected: Bool
+
+    var byteCountDescription: String {
+        ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)
+    }
+
+    init(id: UUID = UUID(), name: String, data: Data, isProtected: Bool) {
+        self.id = id
+        self.name = name
+        self.data = data
+        self.isProtected = isProtected
+    }
+
+    init(attachment: KeePassAttachment) {
+        self.init(name: attachment.name, data: attachment.data, isProtected: attachment.isProtected)
     }
 }

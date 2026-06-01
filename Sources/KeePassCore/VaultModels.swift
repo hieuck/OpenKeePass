@@ -104,7 +104,8 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         password: String,
         url: String,
         notes: String,
-        customFields: [KeePassField]? = nil
+        customFields: [KeePassField]? = nil,
+        attachments: [KeePassAttachment]? = nil
     ) -> KeePassEntry {
         var updated = self
         updated.title = title
@@ -114,6 +115,9 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         updated.notes = notes
         if let customFields {
             updated.customFields = customFields
+        }
+        if let attachments {
+            updated.attachments = attachments
         }
         return updated
     }

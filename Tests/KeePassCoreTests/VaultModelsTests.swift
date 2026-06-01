@@ -107,6 +107,43 @@ final class VaultModelsTests: XCTestCase {
         XCTAssertEqual(updated.history, entry.history)
     }
 
+    func testUpdatingEditableFieldsCanReplaceAttachmentsWhilePreservingCustomFieldsAndHistory() {
+        let entry = KeePassEntry(
+            id: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+            title: "Old",
+            username: "old-user",
+            password: "old-pass",
+            url: "",
+            notes: "",
+            customFields: [
+                KeePassField(name: "Environment", value: "dev", isProtected: false)
+            ],
+            attachments: [
+                KeePassAttachment(name: "old.txt", data: Data("old".utf8), isProtected: false)
+            ],
+            history: [
+                KeePassEntry.fixture(title: "History")
+            ]
+        )
+        let replacementAttachments = [
+            KeePassAttachment(name: "new.txt", data: Data("new".utf8), isProtected: false),
+            KeePassAttachment(name: "secret.bin", data: Data([1, 2, 3]), isProtected: true)
+        ]
+
+        let updated = entry.updatingEditableFields(
+            title: "New",
+            username: "new-user",
+            password: "new-pass",
+            url: "https://example.com",
+            notes: "new notes",
+            attachments: replacementAttachments
+        )
+
+        XCTAssertEqual(updated.attachments, replacementAttachments)
+        XCTAssertEqual(updated.customFields, entry.customFields)
+        XCTAssertEqual(updated.history, entry.history)
+    }
+
     func testAttachmentDisplayMetadata() {
         XCTAssertEqual(
             KeePassAttachment(name: "recovery.txt", data: Data(repeating: 0, count: 512), isProtected: false).byteCountDescription,
