@@ -12,6 +12,7 @@ struct EntryEditorView: View {
     @State private var password: String
     @State private var url: String
     @State private var notes: String
+    @State private var customFields: [EditableCustomField]
 
     init(entry: KeePassEntry?, onSave: @escaping (KeePassEntry) -> Void) {
         self.entry = entry
@@ -21,6 +22,7 @@ struct EntryEditorView: View {
         _password = State(initialValue: entry?.password ?? "")
         _url = State(initialValue: entry?.url ?? "")
         _notes = State(initialValue: entry?.notes ?? "")
+        _customFields = State(initialValue: (entry?.customFields ?? []).map(EditableCustomField.init(field:)))
     }
 
     var body: some View {
@@ -46,6 +48,46 @@ struct EntryEditorView: View {
                 TextEditor(text: $notes)
                     .frame(minHeight: 120)
             }
+
+            Section("Custom Fields") {
+                ForEach($customFields) { $field in
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Name", text: $field.name)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+
+                        if field.isProtected {
+                            SecureField("Value", text: $field.value)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                        } else {
+                            TextField("Value", text: $field.value)
+                                .textInputAutocapitalization(.never)
+                                .disableAutocorrection(true)
+                        }
+
+                        HStack {
+                            Toggle("Protected", isOn: $field.isProtected)
+
+                            Spacer()
+
+                            Button(role: .destructive) {
+                                removeCustomField(id: field.id)
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
+                Button {
+                    customFields.append(EditableCustomField())
+                } label: {
+                    Label("Add Field", systemImage: "plus")
+                }
+            }
         }
         .navigationTitle(entry == nil ? "New Entry" : "Edit Entry")
         .toolbar {
@@ -66,7 +108,8 @@ struct EntryEditorView: View {
                 username: username,
                 password: password,
                 url: url,
-                notes: notes
+                notes: notes,
+                customFields: sanitizedCustomFields()
             )
         }
 
@@ -77,7 +120,37 @@ struct EntryEditorView: View {
             password: password,
             url: url,
             notes: notes,
-            customFields: []
+            customFields: sanitizedCustomFields()
         )
+    }
+
+    private func removeCustomField(id: UUID) {
+        customFields.removeAll { $0.id == id }
+    }
+
+    private func sanitizedCustomFields() -> [KeePassField] {
+        customFields.compactMap { field in
+            let name = field.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            return KeePassField(name: name, value: field.value, isProtected: field.isProtected)
+        }
+    }
+}
+
+private struct EditableCustomField: Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var value: String
+    var isProtected: Bool
+
+    init(id: UUID = UUID(), name: String = "", value: String = "", isProtected: Bool = false) {
+        self.id = id
+        self.name = name
+        self.value = value
+        self.isProtected = isProtected
+    }
+
+    init(field: KeePassField) {
+        self.init(name: field.name, value: field.value, isProtected: field.isProtected)
     }
 }

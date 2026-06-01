@@ -103,7 +103,8 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         username: String,
         password: String,
         url: String,
-        notes: String
+        notes: String,
+        customFields: [KeePassField]? = nil
     ) -> KeePassEntry {
         var updated = self
         updated.title = title
@@ -111,6 +112,9 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         updated.password = password
         updated.url = url
         updated.notes = notes
+        if let customFields {
+            updated.customFields = customFields
+        }
         return updated
     }
 
