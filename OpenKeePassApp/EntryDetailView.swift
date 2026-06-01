@@ -53,6 +53,7 @@ struct EntryDetailView: View {
                     NavigationLink("Edit", destination: EntryEditorView(entry: entry) { updatedEntry in
                         model.updateEntry(updatedEntry)
                     })
+                    NavigationLink("Move", destination: EntryMoveView(model: model, entryID: entry.id))
                 }
 
                 Section {

@@ -103,6 +103,37 @@ final class VaultStoreTests: XCTestCase {
         XCTAssertEqual(store.isDirty, true)
     }
 
+    func testMovingEntryToNestedGroupMarksVaultDirty() async throws {
+        let entry = KeePassEntry.fixture(title: "Admin")
+        let targetGroup = KeePassGroup.fixture(title: "Work")
+        let vault = KeePassVault.fixture(groups: [targetGroup], entries: [entry])
+        let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))
+        try await store.unlock(data: Data([1]), credentials: .init(password: "pw"))
+
+        try store.moveEntry(id: entry.id, toGroup: targetGroup.id)
+
+        let unlocked = try XCTUnwrap(store.unlockedVault)
+        XCTAssertEqual(unlocked.root.entries, [])
+        XCTAssertEqual(unlocked.root.groups.first?.entries, [entry])
+        XCTAssertEqual(store.isDirty, true)
+    }
+
+    func testMovingEntryToMissingGroupDoesNotRemoveEntry() async throws {
+        let entry = KeePassEntry.fixture(title: "Admin")
+        let vault = KeePassVault.fixture(entries: [entry])
+        let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))
+        let missingGroupID = UUID()
+        try await store.unlock(data: Data([1]), credentials: .init(password: "pw"))
+
+        XCTAssertThrowsError(try store.moveEntry(id: entry.id, toGroup: missingGroupID)) { error in
+            XCTAssertEqual(error as? VaultStoreError, .groupNotFound(missingGroupID))
+        }
+
+        let unlocked = try XCTUnwrap(store.unlockedVault)
+        XCTAssertEqual(unlocked.root.entries, [entry])
+        XCTAssertEqual(store.isDirty, false)
+    }
+
     func testAddingAndDeletingGroupMarksVaultDirty() async throws {
         let vault = KeePassVault.fixture()
         let store = VaultStore(engine: FakeKDBXEngine(openResult: .success(vault)))

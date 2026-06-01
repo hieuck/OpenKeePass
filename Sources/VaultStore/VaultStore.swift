@@ -79,6 +79,22 @@ public final class VaultStore {
         state = .unlocked(vault: vault, isDirty: true)
     }
 
+    public func moveEntry(id entryID: UUID, toGroup groupID: UUID) throws {
+        guard case .unlocked(var vault, _) = state else {
+            throw VaultStoreError.noUnlockedVault
+        }
+        guard vault.root.containsGroup(id: groupID) else {
+            throw VaultStoreError.groupNotFound(groupID)
+        }
+        guard let entry = vault.root.removeEntry(id: entryID) else {
+            throw VaultStoreError.entryNotFound(entryID)
+        }
+        guard vault.root.addEntry(entry, toGroup: groupID) else {
+            throw VaultStoreError.groupNotFound(groupID)
+        }
+        state = .unlocked(vault: vault, isDirty: true)
+    }
+
     public func addGroup(_ group: KeePassGroup, toParent parentID: UUID) throws {
         guard case .unlocked(var vault, _) = state else {
             throw VaultStoreError.noUnlockedVault
@@ -165,6 +181,20 @@ private extension KeePassGroup {
         return false
     }
 
+    mutating func removeEntry(id: UUID) -> KeePassEntry? {
+        if let entryIndex = entries.firstIndex(where: { $0.id == id }) {
+            return entries.remove(at: entryIndex)
+        }
+
+        for groupIndex in groups.indices {
+            if let entry = groups[groupIndex].removeEntry(id: id) {
+                return entry
+            }
+        }
+
+        return nil
+    }
+
     mutating func addGroup(_ group: KeePassGroup, toParent parentID: UUID) -> Bool {
         if id == parentID {
             groups.append(group)
@@ -178,6 +208,14 @@ private extension KeePassGroup {
         }
 
         return false
+    }
+
+    func containsGroup(id groupID: UUID) -> Bool {
+        if id == groupID {
+            return true
+        }
+
+        return groups.contains { $0.containsGroup(id: groupID) }
     }
 
     mutating func updateGroup(id groupID: UUID, mutate: (inout KeePassGroup) -> Void) -> Bool {

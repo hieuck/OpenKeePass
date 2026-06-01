@@ -108,6 +108,17 @@ final class VaultSessionModel: ObservableObject {
         }
     }
 
+    func moveEntry(id entryID: UUID, toGroup groupID: UUID) {
+        do {
+            try store.moveEntry(id: entryID, toGroup: groupID)
+            vault = store.unlockedVault
+            isDirty = store.isDirty
+            exportAutoFillCredentials()
+        } catch {
+            errorMessage = "Could not move this entry."
+        }
+    }
+
     func addGroup(title: String, toParent parentID: UUID) {
         let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedTitle.isEmpty else {
@@ -159,6 +170,13 @@ final class VaultSessionModel: ObservableObject {
 
     func entry(id entryID: UUID) -> KeePassEntry? {
         vault?.root.entry(id: entryID)
+    }
+
+    func groupChoices() -> [GroupChoice] {
+        guard let vault else {
+            return []
+        }
+        return vault.root.groupChoices(path: vault.root.title.isEmpty ? vault.name : vault.root.title)
     }
 
     private func exportAutoFillCredentials() {
@@ -216,6 +234,12 @@ final class VaultSessionModel: ObservableObject {
     }
 }
 
+struct GroupChoice: Identifiable, Equatable {
+    let id: UUID
+    let title: String
+    let path: String
+}
+
 private extension KeePassGroup {
     func group(id groupID: UUID) -> KeePassGroup? {
         if id == groupID {
@@ -239,5 +263,13 @@ private extension KeePassGroup {
             }
         }
         return nil
+    }
+
+    func groupChoices(path: String) -> [GroupChoice] {
+        let current = GroupChoice(id: id, title: title, path: path)
+        let children = groups.flatMap { child in
+            child.groupChoices(path: "\(path) / \(child.title)")
+        }
+        return [current] + children
     }
 }
