@@ -97,6 +97,17 @@ final class VaultSessionModel: ObservableObject {
         }
     }
 
+    func deleteEntry(id entryID: UUID) {
+        do {
+            try store.deleteEntry(id: entryID)
+            vault = store.unlockedVault
+            isDirty = store.isDirty
+            exportAutoFillCredentials()
+        } catch {
+            errorMessage = "Could not delete this entry."
+        }
+    }
+
     func group(id groupID: UUID) -> KeePassGroup? {
         vault?.root.group(id: groupID)
     }

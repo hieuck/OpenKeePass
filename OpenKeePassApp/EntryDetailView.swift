@@ -4,8 +4,10 @@ import SwiftUI
 import UIKit
 
 struct EntryDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     @ObservedObject var model: VaultSessionModel
     let entryID: UUID
+    @State private var isConfirmingDelete = false
 
     var body: some View {
         if let entry = model.entry(id: entryID) {
@@ -52,8 +54,25 @@ struct EntryDetailView: View {
                         model.updateEntry(updatedEntry)
                     })
                 }
+
+                Section {
+                    Button(role: .destructive) {
+                        isConfirmingDelete = true
+                    } label: {
+                        Label("Delete Entry", systemImage: "trash")
+                    }
+                }
             }
             .navigationTitle(entry.title)
+            .confirmationDialog("Delete this entry?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+                Button("Delete Entry", role: .destructive) {
+                    model.deleteEntry(id: entry.id)
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This removes the entry from the unlocked vault. Save the vault to write the deletion to the .kdbx file.")
+            }
         } else {
             Text("This entry is no longer available.")
                 .foregroundColor(.secondary)

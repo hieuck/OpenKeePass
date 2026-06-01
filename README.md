@@ -64,7 +64,7 @@ More representative KeePass/KeePassXC desktop-generated databases still need to 
 
 ## Current App Workflow
 
-The app can select a `.kdbx` file from Files, remember the recent vault with a security-scoped bookmark, unlock it with a master password and optional key file, browse the real unlocked group tree, search entries, view entry details, add or edit entries including custom fields, and save edited KDBX 4 vault data back through security-scoped file access.
+The app can select a `.kdbx` file from Files, remember the recent vault with a security-scoped bookmark, unlock it with a master password and optional key file, browse the real unlocked group tree, search entries, view entry details, add, edit, or delete entries including custom fields, and save edited KDBX 4 vault data back through security-scoped file access.
 
 Entry details show copyable time-based one-time password codes when the entry contains a supported TOTP custom field.
 Entry details show non-TOTP custom fields with protected values masked and copyable on demand.
