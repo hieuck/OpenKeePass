@@ -46,4 +46,23 @@ final class PasswordGeneratorTests: XCTestCase {
             XCTAssertEqual(error as? PasswordGeneratorError, .emptyCharacterSet)
         }
     }
+
+    func testCanExcludeAmbiguousCharacters() throws {
+        let generator = PasswordGenerator(random: .deterministic(seed: 4))
+
+        let password = try generator.generateStrict(
+            options: .init(
+                length: 64,
+                includeUppercase: false,
+                includeLowercase: false,
+                includeDigits: true,
+                includeSymbols: false,
+                excludeAmbiguousCharacters: true
+            )
+        )
+
+        XCTAssertFalse(password.contains("0"))
+        XCTAssertFalse(password.contains("1"))
+        XCTAssertTrue(password.allSatisfy { "23456789".contains($0) })
+    }
 }

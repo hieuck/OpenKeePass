@@ -4,19 +4,22 @@ public struct PasswordGeneratorOptions: Equatable, Sendable {
     public var includeLowercase: Bool
     public var includeDigits: Bool
     public var includeSymbols: Bool
+    public var excludeAmbiguousCharacters: Bool
 
     public init(
         length: Int,
         includeUppercase: Bool = true,
         includeLowercase: Bool = true,
         includeDigits: Bool = true,
-        includeSymbols: Bool = false
+        includeSymbols: Bool = false,
+        excludeAmbiguousCharacters: Bool = false
     ) {
         self.length = length
         self.includeUppercase = includeUppercase
         self.includeLowercase = includeLowercase
         self.includeDigits = includeDigits
         self.includeSymbols = includeSymbols
+        self.excludeAmbiguousCharacters = excludeAmbiguousCharacters
     }
 }
 
@@ -74,17 +77,26 @@ public struct PasswordGenerator: Sendable {
 
     private func characterClasses(for options: PasswordGeneratorOptions) -> [[Character]] {
         var classes: [[Character]] = []
+        let ambiguousCharacters = Set("0O1Il")
+        func allowedCharacters(from characters: String) -> [Character] {
+            let allCharacters = Array(characters)
+            guard options.excludeAmbiguousCharacters else {
+                return allCharacters
+            }
+            return allCharacters.filter { !ambiguousCharacters.contains($0) }
+        }
+
         if options.includeUppercase {
-            classes.append(Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+            classes.append(allowedCharacters(from: "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
         }
         if options.includeLowercase {
-            classes.append(Array("abcdefghijklmnopqrstuvwxyz"))
+            classes.append(allowedCharacters(from: "abcdefghijklmnopqrstuvwxyz"))
         }
         if options.includeDigits {
-            classes.append(Array("0123456789"))
+            classes.append(allowedCharacters(from: "0123456789"))
         }
         if options.includeSymbols {
-            classes.append(Array("!@#$%^&*()-_=+[]{};:,.?/"))
+            classes.append(allowedCharacters(from: "!@#$%^&*()-_=+[]{};:,.?/"))
         }
         return classes
     }

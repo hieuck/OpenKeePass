@@ -17,6 +17,13 @@ struct EntryEditorView: View {
     @State private var attachments: [EditableAttachment]
     @State private var isImportingAttachment = false
     @State private var attachmentErrorMessage: String?
+    @State private var generatorLength = 24
+    @State private var generatorIncludesUppercase = true
+    @State private var generatorIncludesLowercase = true
+    @State private var generatorIncludesDigits = true
+    @State private var generatorIncludesSymbols = true
+    @State private var generatorExcludesAmbiguousCharacters = false
+    @State private var generatorErrorMessage: String?
 
     init(entry: KeePassEntry?, onSave: @escaping (KeePassEntry) -> Void) {
         self.entry = entry
@@ -42,10 +49,21 @@ struct EntryEditorView: View {
 
             Section("Password") {
                 SecureField("Password", text: $password)
+                Stepper("Length: \(generatorLength)", value: $generatorLength, in: 8...128)
+                Toggle("Uppercase", isOn: $generatorIncludesUppercase)
+                Toggle("Lowercase", isOn: $generatorIncludesLowercase)
+                Toggle("Digits", isOn: $generatorIncludesDigits)
+                Toggle("Symbols", isOn: $generatorIncludesSymbols)
+                Toggle("Exclude Ambiguous", isOn: $generatorExcludesAmbiguousCharacters)
                 Button {
-                    password = PasswordGenerator().generate(options: .init(length: 24, includeSymbols: true))
+                    generatePassword()
                 } label: {
                     Label("Generate", systemImage: "wand.and.stars")
+                }
+                if let generatorErrorMessage {
+                    Text(generatorErrorMessage)
+                        .font(.caption)
+                        .foregroundColor(.red)
                 }
             }
 
@@ -175,6 +193,28 @@ struct EntryEditorView: View {
 
     private func removeCustomField(id: UUID) {
         customFields.removeAll { $0.id == id }
+    }
+
+    private func generatePassword() {
+        do {
+            password = try PasswordGenerator().generateStrict(
+                options: PasswordGeneratorOptions(
+                    length: generatorLength,
+                    includeUppercase: generatorIncludesUppercase,
+                    includeLowercase: generatorIncludesLowercase,
+                    includeDigits: generatorIncludesDigits,
+                    includeSymbols: generatorIncludesSymbols,
+                    excludeAmbiguousCharacters: generatorExcludesAmbiguousCharacters
+                )
+            )
+            generatorErrorMessage = nil
+        } catch PasswordGeneratorError.emptyCharacterSet {
+            generatorErrorMessage = "Select at least one character type."
+        } catch PasswordGeneratorError.lengthTooShortForRequiredClasses {
+            generatorErrorMessage = "Length is too short for the selected character types."
+        } catch {
+            generatorErrorMessage = "Could not generate a password."
+        }
     }
 
     private func sanitizedCustomFields() -> [KeePassField] {
