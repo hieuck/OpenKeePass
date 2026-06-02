@@ -12,19 +12,19 @@ final class SigningConfigurationTests: XCTestCase {
         )
 
         XCTAssertEqual(
-            appEntitlements["com.apple.security.application-groups"] as? [String],
+            stringArray(appEntitlements["com.apple.security.application-groups"]),
             ["group.dev.openkeepass"]
         )
         XCTAssertEqual(
-            autoFillEntitlements["com.apple.security.application-groups"] as? [String],
+            stringArray(autoFillEntitlements["com.apple.security.application-groups"]),
             ["group.dev.openkeepass"]
         )
         XCTAssertEqual(
-            appEntitlements["keychain-access-groups"] as? [String],
+            stringArray(appEntitlements["keychain-access-groups"]),
             ["$(AppIdentifierPrefix)dev.openkeepass.shared"]
         )
         XCTAssertEqual(
-            autoFillEntitlements["keychain-access-groups"] as? [String],
+            stringArray(autoFillEntitlements["keychain-access-groups"]),
             ["$(AppIdentifierPrefix)dev.openkeepass.shared"]
         )
     }
@@ -72,6 +72,16 @@ private func propertyListDictionary(at url: URL) throws -> [String: Any] {
 
 private enum PropertyListError: Error {
     case notADictionary
+}
+
+private func stringArray(_ value: Any?) -> [String]? {
+    if let strings = value as? [String] {
+        return strings
+    }
+    if let array = value as? NSArray {
+        return array.compactMap { $0 as? String }
+    }
+    return nil
 }
 
 private func XCTAssertContains(
