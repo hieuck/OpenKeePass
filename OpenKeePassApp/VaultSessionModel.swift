@@ -184,23 +184,7 @@ final class VaultSessionModel: ObservableObject {
             return
         }
 
-        let records = vault.root.flattenedEntries().compactMap { entry -> AutoFillCredentialRecord? in
-            let username = entry.username.trimmingCharacters(in: .whitespacesAndNewlines)
-            let password = entry.password.trimmingCharacters(in: .whitespacesAndNewlines)
-            let url = entry.url.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !username.isEmpty, !password.isEmpty, URL(string: url)?.host != nil else {
-                return nil
-            }
-
-            return AutoFillCredentialRecord(
-                id: entry.id.uuidString,
-                title: entry.title,
-                username: entry.username,
-                password: entry.password,
-                url: entry.url
-            )
-        }
+        let records = AutoFillCredentialExporter.records(from: vault)
 
         do {
             try AutoFillCredentialCache(directory: directory).write(records)
