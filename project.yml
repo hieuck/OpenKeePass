@@ -37,6 +37,11 @@ targets:
         PROVISIONING_PROFILE_SPECIFIER: $(OPENKEEPASS_APP_PROFILE_SPECIFIER)
     entitlements:
       path: OpenKeePassApp/OpenKeePassApp.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.openkeepass
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.openkeepass.shared
   OpenKeePassAutoFill:
     type: app-extension
     platform: iOS
@@ -57,6 +62,11 @@ targets:
         PROVISIONING_PROFILE_SPECIFIER: $(OPENKEEPASS_AUTOFILL_PROFILE_SPECIFIER)
     entitlements:
       path: OpenKeePassAutoFill/OpenKeePassAutoFill.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.dev.openkeepass
+        keychain-access-groups:
+          - $(AppIdentifierPrefix)dev.openkeepass.shared
 schemes:
   OpenKeePass:
     build:

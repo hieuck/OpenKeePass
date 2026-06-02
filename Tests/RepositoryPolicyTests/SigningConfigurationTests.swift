@@ -58,6 +58,10 @@ final class SigningConfigurationTests: XCTestCase {
         XCTAssertContains(project, "PROVISIONING_PROFILE_SPECIFIER: $(OPENKEEPASS_APP_PROFILE_SPECIFIER)")
         XCTAssertContains(project, "PRODUCT_BUNDLE_IDENTIFIER: dev.openkeepass.app.autofill")
         XCTAssertContains(project, "PROVISIONING_PROFILE_SPECIFIER: $(OPENKEEPASS_AUTOFILL_PROFILE_SPECIFIER)")
+        XCTAssertEqual(project.components(separatedBy: "com.apple.security.application-groups:").count - 1, 2)
+        XCTAssertEqual(project.components(separatedBy: "keychain-access-groups:").count - 1, 2)
+        XCTAssertEqual(project.components(separatedBy: "group.dev.openkeepass").count - 1, 2)
+        XCTAssertEqual(project.components(separatedBy: "$(AppIdentifierPrefix)dev.openkeepass.shared").count - 1, 2)
     }
 }
 
