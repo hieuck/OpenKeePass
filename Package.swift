@@ -38,6 +38,7 @@ let package = Package(
         ),
         .testTarget(name: "VaultStoreTests", dependencies: ["VaultStore"]),
         .testTarget(name: "SecurityKitTests", dependencies: ["SecurityKit"]),
-        .testTarget(name: "PasswordToolsTests", dependencies: ["PasswordTools"])
+        .testTarget(name: "PasswordToolsTests", dependencies: ["PasswordTools"]),
+        .testTarget(name: "RepositoryPolicyTests", dependencies: [])
     ]
 )

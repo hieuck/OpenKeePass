@@ -75,3 +75,5 @@ When a vault is unlocked or edited, OpenKeePass exports eligible URL credentials
 ## Free Feature Policy
 
 Any feature merged into this repository must be fully usable without payment. Code that adds StoreKit purchases, subscriptions, paywalls, ads, telemetry, or feature locks is out of scope for this product.
+
+`swift test` includes `RepositoryPolicyTests`, which scans app code, manifests, and CI workflows for paid-feature, ad, and telemetry integrations. Policy wording in documentation is explicitly allowlisted in `ci/free-feature-policy-allowlist.json`.

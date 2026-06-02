@@ -1,0 +1,10 @@
+{
+  "README.md": [
+    "feature-lock",
+    "in-app-purchase",
+    "paywall",
+    "storekit",
+    "subscription",
+    "telemetry"
+  ]
+}
