@@ -181,6 +181,23 @@ final class VaultModelsTests: XCTestCase {
         XCTAssertEqual(field.copyValue, "token-secret")
     }
 
+    func testEntryOpenURLAddsHTTPSWhenSchemeIsMissing() {
+        let entry = KeePassEntry.fixture(title: "Example", url: "example.com/login")
+
+        XCTAssertEqual(entry.openURL, URL(string: "https://example.com/login"))
+    }
+
+    func testEntryOpenURLKeepsExistingHTTPSURL() {
+        let entry = KeePassEntry.fixture(title: "Example", url: "https://example.com/login")
+
+        XCTAssertEqual(entry.openURL, URL(string: "https://example.com/login"))
+    }
+
+    func testEntryOpenURLRejectsEmptyOrHostlessValues() {
+        XCTAssertNil(KeePassEntry.fixture(title: "Empty", url: "  ").openURL)
+        XCTAssertNil(KeePassEntry.fixture(title: "Hostless", url: "not a url").openURL)
+    }
+
     func testSearchMatchesNestedEntriesByCommonFields() {
         let matchingByURL = KeePassEntry.fixture(title: "Source", url: "https://github.com/openkeepass")
         let matchingByCustomField = KeePassEntry.fixture(title: "Server", customFields: [.init(name: "host", value: "vault.internal", isProtected: false)])

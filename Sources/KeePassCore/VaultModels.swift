@@ -126,6 +126,21 @@ public struct KeePassEntry: Identifiable, Equatable, Sendable {
         customFields.filter { !$0.isOneTimePasswordConfigurationField }
     }
 
+    public var openURL: URL? {
+        let trimmedURL = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedURL.isEmpty else {
+            return nil
+        }
+
+        let candidate = trimmedURL.contains("://") ? trimmedURL : "https://\(trimmedURL)"
+        guard let parsedURL = URL(string: candidate),
+              let host = parsedURL.host,
+              host.contains(".") else {
+            return nil
+        }
+        return parsedURL
+    }
+
     private var searchableValues: [String] {
         [title, username, url, notes] + customFields.map(\.value)
     }

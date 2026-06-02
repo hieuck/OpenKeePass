@@ -6,30 +6,61 @@ import UIKit
 
 struct EntryDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
     @AppStorage("security.clipboardSeconds") private var clipboardSeconds = 30.0
     @ObservedObject var model: VaultSessionModel
     let entryID: UUID
     @State private var isConfirmingDelete = false
+    @State private var isPasswordVisible = false
 
     var body: some View {
         if let entry = model.entry(id: entryID) {
             Form {
                 Section("Account") {
                     DetailRow(label: "Title", value: entry.title)
-                    DetailRow(label: "Username", value: entry.username)
-                    DetailRow(label: "URL", value: entry.url)
+                    DetailRow(label: "Username", value: entry.username) {
+                        if !entry.username.isEmpty {
+                            CopyButton(label: "Copy Username") {
+                                copyToClipboard(entry.username)
+                            }
+                        }
+                    }
+                    DetailRow(label: "URL", value: entry.url) {
+                        if let url = entry.openURL {
+                            Button {
+                                openURL(url)
+                            } label: {
+                                Image(systemName: "safari")
+                            }
+                            .accessibilityLabel("Open URL")
+                        }
+                        if !entry.url.isEmpty {
+                            CopyButton(label: "Copy URL") {
+                                copyToClipboard(entry.url)
+                            }
+                        }
+                    }
                 }
 
                 Section("Password") {
                     HStack {
-                        Text("••••••••")
+                        if isPasswordVisible {
+                            Text(entry.password)
+                                .font(.body.monospaced())
+                                .textSelection(.enabled)
+                        } else {
+                            Text("••••••••")
+                        }
                         Spacer()
                         Button {
-                            copyToClipboard(entry.password)
+                            isPasswordVisible.toggle()
                         } label: {
-                            Image(systemName: "doc.on.doc")
+                            Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
                         }
-                        .accessibilityLabel("Copy Password")
+                        .accessibilityLabel(isPasswordVisible ? "Hide Password" : "Show Password")
+                        CopyButton(label: "Copy Password") {
+                            copyToClipboard(entry.password)
+                        }
                     }
                 }
 
@@ -92,6 +123,18 @@ struct EntryDetailView: View {
     }
 }
 
+private struct CopyButton: View {
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "doc.on.doc")
+        }
+        .accessibilityLabel(label)
+    }
+}
+
 private struct CustomFieldsSection: View {
     let fields: [KeePassField]
     let copyToClipboard: (String) -> Void
@@ -105,12 +148,9 @@ private struct CustomFieldsSection: View {
                         CustomFieldValueText(field: field)
                     }
                     Spacer()
-                    Button {
+                    CopyButton(label: "Copy \(field.name)") {
                         copyToClipboard(field.copyValue)
-                    } label: {
-                        Image(systemName: "doc.on.doc")
                     }
-                    .accessibilityLabel("Copy \(field.name)")
                 }
             }
         }
@@ -249,9 +289,16 @@ private struct OneTimePasswordSection: View {
     }
 }
 
-private struct DetailRow: View {
+private struct DetailRow<Actions: View>: View {
     let label: String
     let value: String
+    let actions: Actions
+
+    init(label: String, value: String, @ViewBuilder actions: () -> Actions) {
+        self.label = label
+        self.value = value
+        self.actions = actions()
+    }
 
     var body: some View {
         HStack {
@@ -260,6 +307,16 @@ private struct DetailRow: View {
             Text(value)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.trailing)
+                .textSelection(.enabled)
+            actions
         }
+    }
+}
+
+private extension DetailRow where Actions == EmptyView {
+    init(label: String, value: String) {
+        self.label = label
+        self.value = value
+        self.actions = EmptyView()
     }
 }
