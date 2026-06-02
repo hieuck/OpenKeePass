@@ -115,6 +115,13 @@ private struct GroupContentView: View {
                         Label("Delete Group", systemImage: "trash")
                     }
                     .disabled(isRootGroup)
+
+                    Button {
+                        model.lock()
+                        dismiss()
+                    } label: {
+                        Label("Lock Vault", systemImage: "lock.fill")
+                    }
                 } label: {
                     Image(systemName: "plus")
                 }

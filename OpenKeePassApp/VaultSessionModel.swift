@@ -73,6 +73,14 @@ final class VaultSessionModel: ObservableObject {
         }
     }
 
+    func lock() {
+        store.lock()
+        credentials = nil
+        vault = nil
+        isDirty = false
+        errorMessage = nil
+    }
+
     func addEntry(_ entry: KeePassEntry, toGroup groupID: UUID) {
         do {
             try store.addEntry(entry, toGroup: groupID)
