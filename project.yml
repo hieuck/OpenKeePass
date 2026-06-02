@@ -34,6 +34,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.openkeepass.app
         INFOPLIST_FILE: OpenKeePassApp/Info.plist
         CODE_SIGN_STYLE: Automatic
+        PROVISIONING_PROFILE_SPECIFIER: $(OPENKEEPASS_APP_PROFILE_SPECIFIER)
     entitlements:
       path: OpenKeePassApp/OpenKeePassApp.entitlements
   OpenKeePassAutoFill:
@@ -53,6 +54,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: dev.openkeepass.app.autofill
         INFOPLIST_FILE: OpenKeePassAutoFill/Info.plist
         CODE_SIGN_STYLE: Automatic
+        PROVISIONING_PROFILE_SPECIFIER: $(OPENKEEPASS_AUTOFILL_PROFILE_SPECIFIER)
     entitlements:
       path: OpenKeePassAutoFill/OpenKeePassAutoFill.entitlements
 schemes:

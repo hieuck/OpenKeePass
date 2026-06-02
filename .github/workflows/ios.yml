@@ -18,6 +18,11 @@ jobs:
       DERIVED_DATA: ${{ github.workspace }}/DerivedData
       BUILD_DIR: ${{ github.workspace }}/build
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      OPENKEEPASS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.OPENKEEPASS_SIGNING_CERTIFICATE_BASE64 }}
+      OPENKEEPASS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.OPENKEEPASS_SIGNING_CERTIFICATE_PASSWORD }}
+      OPENKEEPASS_APP_PROVISIONING_PROFILE_BASE64: ${{ secrets.OPENKEEPASS_APP_PROVISIONING_PROFILE_BASE64 }}
+      OPENKEEPASS_AUTOFILL_PROVISIONING_PROFILE_BASE64: ${{ secrets.OPENKEEPASS_AUTOFILL_PROVISIONING_PROFILE_BASE64 }}
+      OPENKEEPASS_DEVELOPMENT_TEAM: ${{ secrets.OPENKEEPASS_DEVELOPMENT_TEAM }}
 
     steps:
       - name: Checkout
@@ -62,6 +67,90 @@ jobs:
         with:
           name: OpenKeePass-unsigned-ipa
           path: build/OpenKeePass-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Prepare optional signing assets
+        if: >-
+          env.OPENKEEPASS_SIGNING_CERTIFICATE_BASE64 != '' &&
+          env.OPENKEEPASS_SIGNING_CERTIFICATE_PASSWORD != '' &&
+          env.OPENKEEPASS_APP_PROVISIONING_PROFILE_BASE64 != '' &&
+          env.OPENKEEPASS_AUTOFILL_PROVISIONING_PROFILE_BASE64 != '' &&
+          env.OPENKEEPASS_DEVELOPMENT_TEAM != ''
+        run: |
+          set -euo pipefail
+          CERTIFICATE_PATH="$RUNNER_TEMP/openkeepass-signing.p12"
+          APP_PROFILE_PATH="$HOME/Library/MobileDevice/Provisioning Profiles/openkeepass-app.mobileprovision"
+          AUTOFILL_PROFILE_PATH="$HOME/Library/MobileDevice/Provisioning Profiles/openkeepass-autofill.mobileprovision"
+          KEYCHAIN_PATH="$RUNNER_TEMP/openkeepass-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "$OPENKEEPASS_SIGNING_CERTIFICATE_BASE64" | base64 -D > "$CERTIFICATE_PATH"
+          printf '%s' "$OPENKEEPASS_APP_PROVISIONING_PROFILE_BASE64" | base64 -D > "$APP_PROFILE_PATH"
+          printf '%s' "$OPENKEEPASS_AUTOFILL_PROVISIONING_PROFILE_BASE64" | base64 -D > "$AUTOFILL_PROFILE_PATH"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" -P "$OPENKEEPASS_SIGNING_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          APP_PROFILE_NAME="$(security cms -D -i "$APP_PROFILE_PATH" | /usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin)"
+          AUTOFILL_PROFILE_NAME="$(security cms -D -i "$AUTOFILL_PROFILE_PATH" | /usr/libexec/PlistBuddy -c 'Print :Name' /dev/stdin)"
+          {
+            echo "OPENKEEPASS_KEYCHAIN_PATH=$KEYCHAIN_PATH"
+            echo "OPENKEEPASS_APP_PROFILE_NAME=$APP_PROFILE_NAME"
+            echo "OPENKEEPASS_AUTOFILL_PROFILE_NAME=$AUTOFILL_PROFILE_NAME"
+          } >> "$GITHUB_ENV"
+
+      - name: Create signed export options
+        if: env.OPENKEEPASS_KEYCHAIN_PATH != ''
+        run: |
+          set -euo pipefail
+          printf '<plist version="1.0"><dict/></plist>' > "$BUILD_DIR/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Add :method string development' "$BUILD_DIR/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Add :teamID string '"$OPENKEEPASS_DEVELOPMENT_TEAM" "$BUILD_DIR/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Add :signingStyle string manual' "$BUILD_DIR/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles dict' "$BUILD_DIR/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles:dev.openkeepass.app string '"$OPENKEEPASS_APP_PROFILE_NAME" "$BUILD_DIR/ExportOptions.plist"
+          /usr/libexec/PlistBuddy -c 'Add :provisioningProfiles:dev.openkeepass.app.autofill string '"$OPENKEEPASS_AUTOFILL_PROFILE_NAME" "$BUILD_DIR/ExportOptions.plist"
+
+      - name: Build signed archive
+        if: env.OPENKEEPASS_KEYCHAIN_PATH != ''
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project OpenKeePass.xcodeproj \
+            -scheme OpenKeePass \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$BUILD_DIR/OpenKeePass.xcarchive" \
+            DEVELOPMENT_TEAM="$OPENKEEPASS_DEVELOPMENT_TEAM" \
+            OPENKEEPASS_APP_PROFILE_SPECIFIER="$OPENKEEPASS_APP_PROFILE_NAME" \
+            OPENKEEPASS_AUTOFILL_PROFILE_SPECIFIER="$OPENKEEPASS_AUTOFILL_PROFILE_NAME" \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGNING_ALLOWED=YES \
+            OTHER_CODE_SIGN_FLAGS="--keychain $OPENKEEPASS_KEYCHAIN_PATH" \
+            archive | tee "$BUILD_DIR-signed-xcodebuild.log"
+
+      - name: Export signed IPA
+        if: env.OPENKEEPASS_KEYCHAIN_PATH != ''
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$BUILD_DIR/OpenKeePass.xcarchive" \
+            -exportPath "$BUILD_DIR/signed-export" \
+            -exportOptionsPlist "$BUILD_DIR/ExportOptions.plist"
+          cp "$BUILD_DIR/signed-export/OpenKeePass.ipa" "$BUILD_DIR/OpenKeePass-signed.ipa"
+
+      - name: Upload signed IPA artifact
+        if: env.OPENKEEPASS_KEYCHAIN_PATH != ''
+        uses: actions/upload-artifact@v6
+        with:
+          name: OpenKeePass-signed-ipa
+          path: build/OpenKeePass-signed.ipa
           if-no-files-found: error
 
       - name: Upload build log

@@ -29,13 +29,21 @@ swift test
 
 ## CI Packaging
 
-GitHub Actions generates the Xcode project, runs `swift test`, builds the app and AutoFill extension for iOS, packages an unsigned `.ipa`, and uploads the IPA plus the build log as workflow artifacts.
+GitHub Actions generates the Xcode project, runs `swift test`, builds the app and AutoFill extension for iOS, packages an unsigned `.ipa`, and uploads the IPA plus the build log as workflow artifacts. If signing secrets are configured, the same workflow also imports the certificate and provisioning profiles, archives a signed build, exports a signed `.ipa`, and uploads it as a separate artifact.
 
-The current public artifact is:
+The default public artifact is:
 
 - `OpenKeePass-unsigned-ipa` containing `OpenKeePass-unsigned.ipa`
 
-The workflow is intentionally signing-secret-free by default. Ad-hoc or development signing can be layered on later with repository secrets and provisioning profiles.
+Optional signed artifacts use these repository secrets:
+
+- `OPENKEEPASS_SIGNING_CERTIFICATE_BASE64`: base64-encoded `.p12` signing certificate.
+- `OPENKEEPASS_SIGNING_CERTIFICATE_PASSWORD`: password for the `.p12` certificate.
+- `OPENKEEPASS_APP_PROVISIONING_PROFILE_BASE64`: base64-encoded provisioning profile for `dev.openkeepass.app`.
+- `OPENKEEPASS_AUTOFILL_PROVISIONING_PROFILE_BASE64`: base64-encoded provisioning profile for `dev.openkeepass.app.autofill`.
+- `OPENKEEPASS_DEVELOPMENT_TEAM`: Apple Developer Team ID.
+
+When all signing secrets are present, the workflow uploads `OpenKeePass-signed-ipa` containing `OpenKeePass-signed.ipa`. The unsigned artifact remains available for transparent CI verification without private Apple credentials.
 
 ## KeePass Compatibility Status
 
